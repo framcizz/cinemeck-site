@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Painel — CineMeck</title>
+<style>
+  :root { --bg:#171722; --card:#1e1e2b; --vermelho:#E50914; --texto:#e8e8ee; --sub:#9b9ba6; --borda:#2a2a3a; --campo:#15151f; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; background:var(--bg); color:var(--texto);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    padding:20px; display:flex; justify-content:center;
+  }
+  .tudo { width:100%; max-width:620px; }
+  .logo { text-align:center; font-size:26px; font-weight:900; margin-bottom:20px; }
+  .logo span { color:var(--vermelho); }
+  .card {
+    background:var(--card); border:1px solid var(--borda);
+    border-radius:18px; padding:22px; margin-bottom:16px;
+  }
+  h2 { font-size:15px; margin:0 0 14px; font-weight:800; }
+  label { display:block; font-size:13px; color:var(--sub); margin:12px 0 6px; }
+  input, textarea, select {
+    width:100%; background:var(--campo); border:1px solid #33333f; border-radius:12px;
+    padding:13px; color:#fff; font-size:15px; outline:none; font-family:inherit;
+  }
+  input:focus, textarea:focus, select:focus { border-color:var(--vermelho); }
+  textarea { min-height:70px; resize:vertical; }
+  button {
+    width:100%; margin-top:16px; background:var(--vermelho); color:#fff;
+    border:none; border-radius:12px; padding:14px; font-size:15px; font-weight:800; cursor:pointer;
+  }
+  button.secundario { background:#2f2f3d; }
+  button:disabled { opacity:.55; cursor:default; }
+  .linha { display:flex; gap:12px; }
+  .linha > * { flex:1; }
+  .msg { font-size:13px; margin-top:12px; line-height:1.6; white-space:pre-wrap; min-height:18px; }
+  .ok { color:#22C55E; } .erro { color:#ff6b6b; }
+  .oculto { display:none; }
+  .numeros { display:flex; gap:12px; text-align:center; }
+  .numeros > div { flex:1; background:var(--campo); border-radius:12px; padding:14px 8px; }
+  .numeros .n { font-size:24px; font-weight:900; }
+  .numeros .r { font-size:11px; color:var(--sub); margin-top:2px; }
+  .caixaCodigos {
+    margin-top:14px; max-height:260px; overflow:auto;
+    border:1px solid var(--borda); border-radius:12px;
+  }
+  .cod {
+    display:flex; align-items:center; gap:10px; padding:11px 13px;
+    border-bottom:1px solid #26263300; border-bottom:1px solid #262633;
+  }
+  .cod:last-child { border-bottom:none; }
+  .cod .txt { flex:1; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:14px; }
+  .cod .dias { font-size:11px; color:var(--sub); }
+  .selo { font-size:10px; font-weight:800; padding:3px 8px; border-radius:999px; }
+  .livre { background:rgba(34,197,94,.15); color:#22C55E; }
+  .usado { background:rgba(155,155,166,.15); color:var(--sub); }
+  .copiar { background:none; border:1px solid var(--borda); color:var(--sub);
+            width:auto; margin:0; padding:5px 10px; font-size:11px; border-radius:8px; }
+  .aviso { font-size:12px; color:var(--sub); line-height:1.5; margin-top:10px; }
+  .marcador { display:flex; align-items:center; gap:8px; margin-top:14px; }
+  .marcador input { width:auto; }
+  .marcador label { margin:0; color:var(--texto); font-size:14px; }
+</style>
+</head>
+<body>
+<div class="tudo">
+  <div class="logo">Cine<span>Meck</span></div>
+
+  <!-- ===== entrada ===== -->
+  <div class="card" id="cardEntrar">
+    <h2>Painel do administrador</h2>
+    <label for="senha">Senha</label>
+    <input id="senha" type="password" autocomplete="current-password" placeholder="••••••••" />
+    <button id="btEntrar">Entrar</button>
+    <div class="msg" id="msgEntrar"></div>
+    <div class="aviso">A senha é a mesma do envio de notificação, guardada em <code>app_config.notif_pin</code>.</div>
+  </div>
+
+  <div id="painel" class="oculto">
+    <!-- ===== resumo ===== -->
+    <div class="card">
+      <h2>Agora</h2>
+      <div class="numeros">
+        <div><div class="n" id="nVips">—</div><div class="r">VIPs ativos</div></div>
+        <div><div class="n" id="nLivres">—</div><div class="r">códigos livres</div></div>
+        <div><div class="n" id="nUsados">—</div><div class="r">já usados</div></div>
+      </div>
+    </div>
+
+    <!-- ===== codigos vip ===== -->
+    <div class="card">
+      <h2>Códigos VIP</h2>
+      <div class="linha">
+        <div>
+          <label for="dias">Dias de VIP</label>
+          <input id="dias" type="number" value="30" min="1" max="3650" />
+        </div>
+        <div>
+          <label for="qtd">Quantos gerar</label>
+          <input id="qtd" type="number" value="1" min="1" max="50" />
+        </div>
+      </div>
+      <label for="personalizado">Ou um código escolhido por você <span style="opacity:.7">— opcional</span></label>
+      <input id="personalizado" type="text" placeholder="Ex.: JESSICA" maxlength="32" />
+      <button id="btGerar">Gerar código</button>
+      <div class="msg" id="msgCodigos"></div>
+      <div class="caixaCodigos oculto" id="caixaCodigos"></div>
+      <button class="secundario" id="btListar">Ver os últimos códigos</button>
+    </div>
+
+    <!-- ===== versao do app ===== -->
+    <div class="card">
+      <h2>Versão do app</h2>
+      <div class="aviso" style="margin-top:0">
+        O app compara esta versão com a instalada. Se for maior, oferece a atualização.
+      </div>
+      <label for="versao">Versão</label>
+      <input id="versao" type="text" placeholder="1.0.8" />
+      <label for="apkUrl">Link do APK</label>
+      <input id="apkUrl" type="url" placeholder="https://..." />
+      <label for="notas">Novidades desta versão</label>
+      <textarea id="notas" placeholder="O que mudou..."></textarea>
+      <div class="marcador">
+        <input id="obrigatoria" type="checkbox" />
+        <label for="obrigatoria">Atualização obrigatória</label>
+      </div>
+      <div class="marcador">
+        <input id="apkDireto" type="checkbox" />
+        <label for="apkDireto">Baixar dentro do app</label>
+      </div>
+      <button id="btSalvar">Salvar</button>
+      <div class="msg" id="msgConfig"></div>
+    </div>
+
+    <div class="card">
+      <h2>Notificações</h2>
+      <div class="aviso" style="margin-top:0">Enviar push para todos os aparelhos.</div>
+      <button class="secundario" onclick="location.href='enviar.html'">Abrir envio de notificação</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var API = 'https://hulydzwtxomswogbdnap.supabase.co/functions/v1/painel-admin';
+  var $ = function (id) { return document.getElementById(id); };
+  var senhaAtual = '';
+
+  function mostrar(el, texto, classe) {
+    el.textContent = texto;
+    el.className = 'msg ' + (classe || '');
+  }
+
+  // A senha fica só em memória: nada de localStorage, senão ela sobreviveria
+  // à aba fechada em qualquer computador onde o painel foi aberto.
+  function chamar(acao, extra) {
+    var corpo = Object.assign({ senha: senhaAtual, acao: acao }, extra || {});
+    return fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpo),
+    }).then(function (r) { return r.json().catch(function () { return { ok: false, erro: 'Resposta inválida do servidor.' }; }); });
+  }
+
+  // ----- entrar -----
+  function entrar() {
+    var s = $('senha').value.trim();
+    if (!s) { mostrar($('msgEntrar'), 'Digite a senha.', 'erro'); return; }
+    senhaAtual = s;
+    $('btEntrar').disabled = true;
+    mostrar($('msgEntrar'), 'Conferindo...', '');
+    chamar('resumo').then(function (d) {
+      if (!d.ok) { senhaAtual = ''; mostrar($('msgEntrar'), d.erro || 'Não deu para entrar.', 'erro'); return; }
+      $('cardEntrar').classList.add('oculto');
+      $('painel').classList.remove('oculto');
+      pintarResumo(d);
+      carregarConfig();
+    }).catch(function (e) {
+      senhaAtual = '';
+      mostrar($('msgEntrar'), 'Erro de rede: ' + e, 'erro');
+    }).then(function () { $('btEntrar').disabled = false; });
+  }
+  $('btEntrar').addEventListener('click', entrar);
+  $('senha').addEventListener('keydown', function (e) { if (e.key === 'Enter') entrar(); });
+
+  function pintarResumo(d) {
+    $('nVips').textContent = d.vips_ativos;
+    $('nLivres').textContent = d.codigos_livres;
+    $('nUsados').textContent = d.codigos_usados;
+  }
+  function atualizarResumo() { chamar('resumo').then(function (d) { if (d.ok) pintarResumo(d); }); }
+
+  // ----- códigos -----
+  $('btGerar').addEventListener('click', function () {
+    var extra = {
+      dias: parseInt($('dias').value, 10) || 30,
+      quantidade: parseInt($('qtd').value, 10) || 1,
+      personalizado: $('personalizado').value.trim(),
+    };
+    $('btGerar').disabled = true;
+    mostrar($('msgCodigos'), 'Gerando...', '');
+    chamar('criar_codigos', extra).then(function (d) {
+      if (!d.ok) { mostrar($('msgCodigos'), d.erro || 'Não deu para gerar.', 'erro'); return; }
+      var lista = (d.criados || []).map(function (c) { return c.codigo; });
+      mostrar($('msgCodigos'), 'Pronto:\n' + lista.join('\n'), 'ok');
+      $('personalizado').value = '';
+      atualizarResumo();
+      listar();
+    }).catch(function (e) {
+      mostrar($('msgCodigos'), 'Erro de rede: ' + e, 'erro');
+    }).then(function () { $('btGerar').disabled = false; });
+  });
+
+  function listar() {
+    var caixa = $('caixaCodigos');
+    chamar('listar_codigos').then(function (d) {
+      if (!d.ok) { mostrar($('msgCodigos'), d.erro || 'Não deu para listar.', 'erro'); return; }
+      caixa.innerHTML = '';
+      (d.codigos || []).forEach(function (c) {
+        var linha = document.createElement('div');
+        linha.className = 'cod';
+
+        var txt = document.createElement('div');
+        txt.className = 'txt';
+        txt.textContent = c.codigo;
+
+        var dias = document.createElement('div');
+        dias.className = 'dias';
+        dias.textContent = c.dias + 'd';
+
+        var selo = document.createElement('span');
+        selo.className = 'selo ' + (c.usado ? 'usado' : 'livre');
+        selo.textContent = c.usado ? 'usado' : 'livre';
+
+        linha.appendChild(txt);
+        linha.appendChild(dias);
+        linha.appendChild(selo);
+
+        if (!c.usado) {
+          var bt = document.createElement('button');
+          bt.className = 'copiar';
+          bt.textContent = 'copiar';
+          bt.addEventListener('click', function () {
+            navigator.clipboard.writeText(c.codigo).then(function () {
+              bt.textContent = 'copiado';
+              setTimeout(function () { bt.textContent = 'copiar'; }, 1500);
+            });
+          });
+          linha.appendChild(bt);
+        }
+        caixa.appendChild(linha);
+      });
+      caixa.classList.remove('oculto');
+    });
+  }
+  $('btListar').addEventListener('click', listar);
+
+  // ----- versão do app -----
+  function carregarConfig() {
+    chamar('ler_config').then(function (d) {
+      if (!d.ok) return;
+      var c = d.config || {};
+      $('versao').value = c.versao || '';
+      $('apkUrl').value = c.apk_url || '';
+      $('notas').value = c.notas || '';
+      $('obrigatoria').checked = !!c.obrigatoria;
+      $('apkDireto').checked = c.apk_direto !== false;
+    });
+  }
+
+  $('btSalvar').addEventListener('click', function () {
+    var extra = {
+      versao: $('versao').value.trim(),
+      apk_url: $('apkUrl').value.trim(),
+      notas: $('notas').value.trim(),
+      obrigatoria: $('obrigatoria').checked,
+      apk_direto: $('apkDireto').checked,
+    };
+    if (!confirm('Salvar a versão ' + extra.versao + '?\n\nSe ela for maior que a instalada, os usuários passam a ver o aviso de atualização.')) return;
+    $('btSalvar').disabled = true;
+    mostrar($('msgConfig'), 'Salvando...', '');
+    chamar('salvar_config', extra).then(function (d) {
+      mostrar($('msgConfig'), d.ok ? 'Salvo.' : (d.erro || 'Não deu para salvar.'), d.ok ? 'ok' : 'erro');
+    }).catch(function (e) {
+      mostrar($('msgConfig'), 'Erro de rede: ' + e, 'erro');
+    }).then(function () { $('btSalvar').disabled = false; });
+  });
+})();
+</script>
+</body>
+</html>
