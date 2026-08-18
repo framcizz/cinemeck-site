@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Enviar notificação — CineMeck</title>
+<style>
+  :root { --bg:#171722; --card:#1e1e2b; --vermelho:#E50914; --texto:#e8e8ee; --sub:#9b9ba6; --borda:#2a2a3a; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; background:var(--bg); color:var(--texto);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .card {
+    width:100%; max-width:460px; background:var(--card);
+    border:1px solid var(--borda); border-radius:18px; padding:28px 24px;
+  }
+  .logo { text-align:center; font-size:26px; font-weight:900; margin-bottom:6px; }
+  .logo span { color:var(--vermelho); }
+  h1 { font-size:18px; text-align:center; margin:0 0 4px; font-weight:800; }
+  .alerta {
+    font-size:12px; color:var(--sub); text-align:center; margin:0 0 20px; line-height:1.5;
+  }
+  label { display:block; font-size:13px; color:var(--sub); margin:14px 0 6px; }
+  .opcional { font-size:11px; opacity:.7; }
+  input, textarea {
+    width:100%; background:#15151f; border:1px solid #33333f; border-radius:12px;
+    padding:14px; color:#fff; font-size:15px; outline:none; font-family:inherit;
+  }
+  textarea { min-height:96px; resize:vertical; }
+  input:focus, textarea:focus { border-color:var(--vermelho); }
+  .contador { font-size:11px; color:var(--sub); text-align:right; margin-top:4px; }
+  button {
+    width:100%; margin-top:22px; background:var(--vermelho); color:#fff;
+    border:none; border-radius:12px; padding:15px; font-size:16px; font-weight:800; cursor:pointer;
+  }
+  button:disabled { opacity:.55; cursor:default; }
+  .msg { font-size:14px; margin-top:16px; min-height:20px; line-height:1.6; white-space:pre-wrap; }
+  .ok { color:#22C55E; }
+  .erro { color:#ff6b6b; }
+  .aviso { color:#F5C518; }
+  .previa {
+    margin-top:18px; padding:14px; border:1px dashed var(--borda); border-radius:12px;
+    background:#15151f;
+  }
+  .previa .rotulo { font-size:11px; color:var(--sub); margin-bottom:8px; }
+  .previa .pTitulo { font-size:14px; font-weight:800; }
+  .previa .pMsg { font-size:13px; color:#c9c9d4; margin-top:2px; white-space:pre-wrap; }
+  .previa img { max-width:100%; border-radius:8px; margin-top:8px; display:none; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Cine<span>Meck</span></div>
+    <h1>Enviar notificação</h1>
+    <p class="alerta">Isto envia um push para <strong>todos</strong> os aparelhos com o app instalado. Não dá para cancelar depois.</p>
+
+    <label for="senha">Senha do painel</label>
+    <input id="senha" type="password" autocomplete="current-password" placeholder="••••••••" />
+
+    <label for="titulo">Título</label>
+    <input id="titulo" type="text" value="CineMeck" maxlength="60" />
+
+    <label for="mensagem">Mensagem</label>
+    <textarea id="mensagem" maxlength="300" placeholder="Ex.: Chegou a nova temporada de..."></textarea>
+    <div class="contador"><span id="conta">0</span>/300</div>
+
+    <label for="imagem">Imagem <span class="opcional">— opcional, link http(s)</span></label>
+    <input id="imagem" type="url" placeholder="https://..." />
+
+    <div class="previa">
+      <div class="rotulo">Prévia</div>
+      <div class="pTitulo" id="pTitulo">CineMeck</div>
+      <div class="pMsg" id="pMsg">Sua mensagem aparece aqui.</div>
+      <img id="pImg" alt="" />
+    </div>
+
+    <button id="botao">Enviar notificação</button>
+    <div class="msg" id="msg"></div>
+  </div>
+
+<script>
+(function () {
+  var API = 'https://hulydzwtxomswogbdnap.supabase.co/functions/v1/painel-notificacao';
+
+  var $ = function (id) { return document.getElementById(id); };
+  var senha = $('senha'), titulo = $('titulo'), mensagem = $('mensagem'), imagem = $('imagem');
+  var botao = $('botao'), msg = $('msg'), conta = $('conta');
+  var pTitulo = $('pTitulo'), pMsg = $('pMsg'), pImg = $('pImg');
+
+  function mostrar(texto, classe) {
+    msg.textContent = texto;
+    msg.className = 'msg ' + (classe || '');
+  }
+
+  // Prévia ao vivo: ver o que vai sair antes de disparar para todo mundo
+  function atualizarPrevia() {
+    pTitulo.textContent = titulo.value.trim() || 'CineMeck';
+    pMsg.textContent = mensagem.value.trim() || 'Sua mensagem aparece aqui.';
+    conta.textContent = mensagem.value.length;
+    var url = imagem.value.trim();
+    if (/^https?:\/\//i.test(url)) { pImg.src = url; pImg.style.display = 'block'; }
+    else { pImg.removeAttribute('src'); pImg.style.display = 'none'; }
+  }
+  [titulo, mensagem, imagem].forEach(function (campo) {
+    campo.addEventListener('input', atualizarPrevia);
+  });
+  atualizarPrevia();
+
+  botao.addEventListener('click', function () {
+    var corpo = {
+      senha: senha.value.trim(),
+      titulo: titulo.value.trim() || 'CineMeck',
+      mensagem: mensagem.value.trim(),
+      imagem: imagem.value.trim(),
+    };
+
+    if (!corpo.senha) { mostrar('Digite a senha do painel.', 'erro'); senha.focus(); return; }
+    if (!corpo.mensagem) { mostrar('Escreva a mensagem.', 'erro'); mensagem.focus(); return; }
+    if (corpo.imagem && !/^https?:\/\//i.test(corpo.imagem)) {
+      mostrar('A imagem precisa ser um link começando com http:// ou https://', 'erro');
+      imagem.focus(); return;
+    }
+
+    // Envio atinge todos os usuários e não tem volta: confirma antes.
+    if (!confirm('Enviar esta notificação para TODOS os usuários?\n\n' + corpo.titulo + '\n' + corpo.mensagem)) return;
+
+    botao.disabled = true;
+    mostrar('Enviando...', '');
+
+    fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpo),
+    })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (d) {
+        if (d.ok) {
+          var linhas = ['Enviada.'];
+          if (d.enviados != null) linhas.push('Entregues: ' + d.enviados);
+          if (d.falhas) linhas.push('Falhas: ' + d.falhas);
+          if (d.removidos) linhas.push('Tokens removidos: ' + d.removidos);
+          if (d.aviso) linhas.push(d.aviso);
+          mostrar(linhas.join('\n'), 'ok');
+          mensagem.value = ''; imagem.value = '';
+          atualizarPrevia();
+        } else {
+          // a função devolve ok:false também quando salva no sino mas o push
+          // não sai (falta chave do Firebase) -- por isso a cor de aviso
+          mostrar(d.erro || 'Não deu para enviar.', d.inbox_id ? 'aviso' : 'erro');
+        }
+      })
+      .catch(function (e) {
+        mostrar('Erro de rede: ' + e + '\nConfira sua conexão e tente de novo.', 'erro');
+      })
+      .then(function () { botao.disabled = false; });
+  });
+})();
+</script>
+</body>
+</html>
