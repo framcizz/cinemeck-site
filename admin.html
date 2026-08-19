@@ -59,6 +59,12 @@
   .usado { background:rgba(155,155,166,.15); color:var(--sub); }
   .copiar { background:none; border:1px solid var(--borda); color:var(--sub);
             width:auto; margin:0; padding:5px 10px; font-size:11px; border-radius:8px; }
+  .lixeira { background:none; border:1px solid #4a2a30; color:#ff6b6b;
+             width:auto; margin:0; padding:5px 9px; font-size:13px; line-height:1;
+             border-radius:8px; }
+  .lixeira:hover { background:rgba(255,107,107,.12); }
+  .off { background:rgba(255,107,107,.15); color:#ff6b6b; }
+  .cod .pct { font-size:13px; font-weight:800; color:#22C55E; }
   .aviso { font-size:12px; color:var(--sub); line-height:1.5; margin-top:10px; }
   .marcador { display:flex; align-items:center; gap:8px; margin-top:14px; }
   .marcador input { width:auto; }
@@ -87,6 +93,7 @@
         <div><div class="n" id="nVips">—</div><div class="r">VIPs ativos</div></div>
         <div><div class="n" id="nLivres">—</div><div class="r">códigos livres</div></div>
         <div><div class="n" id="nUsados">—</div><div class="r">já usados</div></div>
+        <div><div class="n" id="nCupons">—</div><div class="r">cupons ativos</div></div>
       </div>
     </div>
 
@@ -109,6 +116,37 @@
       <div class="msg" id="msgCodigos"></div>
       <div class="caixaCodigos oculto" id="caixaCodigos"></div>
       <button class="secundario" id="btListar">Ver os últimos códigos</button>
+    </div>
+
+    <!-- ===== cupons de desconto ===== -->
+    <div class="card">
+      <h2>Cupons de desconto</h2>
+      <div class="aviso" style="margin-top:0">
+        Desconto em porcentagem sobre o valor do plano, na tela de planos do app.
+        Cada pessoa usa um cupom uma única vez.
+      </div>
+
+      <label for="cupomCodigo">Código do cupom</label>
+      <input id="cupomCodigo" type="text" placeholder="Ex.: NATAL50" maxlength="32" />
+
+      <div class="linha">
+        <div>
+          <label for="cupomPct">Desconto (%)</label>
+          <input id="cupomPct" type="number" value="50" min="1" max="90" />
+        </div>
+        <div>
+          <label for="cupomUsos">Limite de usos</label>
+          <input id="cupomUsos" type="number" placeholder="vazio = sem limite" min="1" />
+        </div>
+      </div>
+
+      <label for="cupomValidade">Vale até <span style="opacity:.7">— vazio = sem prazo</span></label>
+      <input id="cupomValidade" type="datetime-local" />
+
+      <button id="btCriarCupom">Criar cupom</button>
+      <div class="msg" id="msgCupons"></div>
+      <div class="caixaCodigos oculto" id="caixaCupons"></div>
+      <button class="secundario" id="btListarCupons">Ver os cupons</button>
     </div>
 
     <!-- ===== versao do app ===== -->
@@ -190,6 +228,7 @@
     $('nVips').textContent = d.vips_ativos;
     $('nLivres').textContent = d.codigos_livres;
     $('nUsados').textContent = d.codigos_usados;
+    $('nCupons').textContent = d.cupons_ativos != null ? d.cupons_ativos : '—';
   }
   function atualizarResumo() { chamar('resumo').then(function (d) { if (d.ok) pintarResumo(d); }); }
 
@@ -251,12 +290,134 @@
           });
           linha.appendChild(bt);
         }
+
+        var lix = document.createElement('button');
+        lix.className = 'lixeira';
+        lix.title = 'Excluir';
+        lix.textContent = '\u2715';
+        lix.addEventListener('click', function () {
+          // Apagar um código já usado não tira o VIP de ninguém: o VIP mora
+          // em outra tabela. O que se perde é o registro do código.
+          var aviso = c.usado
+            ? 'Excluir ' + c.codigo + '?\n\nEle já foi usado. Quem resgatou continua VIP; some só o registro do código.'
+            : 'Excluir ' + c.codigo + '?';
+          if (!confirm(aviso)) return;
+          lix.disabled = true;
+          chamar('excluir_codigo', { codigo: c.codigo }).then(function (d) {
+            if (!d.ok) { mostrar($('msgCodigos'), d.erro || 'Não deu para excluir.', 'erro'); lix.disabled = false; return; }
+            linha.remove();
+            mostrar($('msgCodigos'), 'Código ' + c.codigo + ' excluído.', 'ok');
+            atualizarResumo();
+          });
+        });
+        linha.appendChild(lix);
+
         caixa.appendChild(linha);
       });
       caixa.classList.remove('oculto');
     });
   }
   $('btListar').addEventListener('click', listar);
+
+  // ----- cupons de desconto -----
+  $('btCriarCupom').addEventListener('click', function () {
+    var codigo = ($('cupomCodigo').value || '').trim().toUpperCase();
+    if (!codigo) { mostrar($('msgCupons'), 'Escreva o código do cupom.', 'erro'); return; }
+
+    var extra = {
+      codigo: codigo,
+      desconto_pct: $('cupomPct').value,
+      usos_max: $('cupomUsos').value,
+      // O input datetime-local devolve hora local sem fuso. Mandamos assim
+      // mesmo: o servidor interpreta com o fuso dele, e a diferença de
+      // algumas horas no fim da campanha não muda nada na prática.
+      validade: $('cupomValidade').value || ''
+    };
+
+    $('btCriarCupom').disabled = true;
+    mostrar($('msgCupons'), 'Criando...', '');
+    chamar('criar_cupom', extra).then(function (d) {
+      if (!d.ok) { mostrar($('msgCupons'), d.erro || 'Não deu para criar.', 'erro'); return; }
+      mostrar($('msgCupons'), 'Cupom ' + d.cupom.codigo + ' criado: ' + d.cupom.desconto_pct + '% de desconto.', 'ok');
+      $('cupomCodigo').value = '';
+      $('cupomUsos').value = '';
+      $('cupomValidade').value = '';
+      atualizarResumo();
+      listarCupons();
+    }).catch(function (e) {
+      mostrar($('msgCupons'), 'Falha de rede: ' + e, 'erro');
+    }).then(function () { $('btCriarCupom').disabled = false; });
+  });
+
+  function dataCurta(iso) {
+    if (!iso) return 'sem prazo';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return 'sem prazo';
+    return 'até ' + d.toLocaleDateString('pt-BR');
+  }
+
+  function listarCupons() {
+    var caixa = $('caixaCupons');
+    chamar('listar_cupons').then(function (d) {
+      if (!d.ok) { mostrar($('msgCupons'), d.erro || 'Não deu para listar.', 'erro'); return; }
+      caixa.innerHTML = '';
+
+      if (!(d.cupons || []).length) {
+        var vazio = document.createElement('div');
+        vazio.className = 'cod';
+        vazio.innerHTML = '<div class="txt" style="color:var(--sub)">Nenhum cupom criado ainda.</div>';
+        caixa.appendChild(vazio);
+      }
+
+      (d.cupons || []).forEach(function (c) {
+        var linha = document.createElement('div');
+        linha.className = 'cod';
+
+        var txt = document.createElement('div');
+        txt.className = 'txt';
+        txt.textContent = c.codigo;
+
+        var pct = document.createElement('div');
+        pct.className = 'pct';
+        pct.textContent = c.desconto_pct + '%';
+
+        var info = document.createElement('div');
+        info.className = 'dias';
+        var usos = c.usos + (c.usos_max != null ? '/' + c.usos_max : '');
+        info.textContent = usos + ' · ' + dataCurta(c.validade);
+
+        var selo = document.createElement('span');
+        var morto = c.vencido || c.esgotado || !c.ativo;
+        selo.className = 'selo ' + (morto ? 'off' : 'livre');
+        selo.textContent = c.vencido ? 'vencido' : c.esgotado ? 'esgotado' : !c.ativo ? 'desligado' : 'valendo';
+
+        var lix = document.createElement('button');
+        lix.className = 'lixeira';
+        lix.title = 'Excluir';
+        lix.textContent = '\u2715';
+        lix.addEventListener('click', function () {
+          if (!confirm('Excluir o cupom ' + c.codigo + '?\n\nQuem já pagou com ele não é afetado.')) return;
+          lix.disabled = true;
+          chamar('excluir_cupom', { codigo: c.codigo }).then(function (r) {
+            if (!r.ok) { mostrar($('msgCupons'), r.erro || 'Não deu para excluir.', 'erro'); lix.disabled = false; return; }
+            linha.remove();
+            mostrar($('msgCupons'), 'Cupom ' + c.codigo + ' excluído.', 'ok');
+            atualizarResumo();
+          });
+        });
+
+        linha.appendChild(txt);
+        linha.appendChild(pct);
+        linha.appendChild(info);
+        linha.appendChild(selo);
+        linha.appendChild(lix);
+        caixa.appendChild(linha);
+      });
+
+      caixa.classList.remove('oculto');
+    });
+  }
+  $('btListarCupons').addEventListener('click', listarCupons);
 
   // ----- versão do app -----
   function carregarConfig() {
