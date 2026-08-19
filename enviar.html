@@ -31,7 +31,13 @@
     background:#23232f; border:1px solid #33333f; border-radius:10px; color:var(--sub);
   }
   .abas button.on { background:var(--vermelho); border-color:var(--vermelho); color:#fff; }
-  .oculto { display:none; }
+  /* !important porque .escolhido declara display:flex e vem depois: com a
+     mesma especificidade, a regra de baixo ganhava e a caixa aparecia vazia.
+     Classe utilitaria de esconder tem que valer independente da ordem. */
+  .oculto { display:none !important; }
+  .linhaBusca { display:flex; gap:8px; }
+  .linhaBusca input { flex:1; }
+  .linhaBusca button { width:auto; margin:0; padding:0 18px; font-size:14px; }
   .achados { margin-top:10px; border:1px solid #33333f; border-radius:10px; max-height:220px; overflow:auto; }
   .achado { display:flex; align-items:center; gap:9px; padding:10px 12px; cursor:pointer;
             border-bottom:1px solid #262633; }
@@ -105,7 +111,10 @@
 
     <div id="paineConteudo" class="oculto">
       <label for="busca">Procure o filme, série ou anime</label>
-      <input id="busca" type="text" placeholder="Digite parte do título e aperte Enter" />
+      <div class="linhaBusca">
+        <input id="busca" type="text" placeholder="Parte do título" />
+        <button type="button" id="btBuscar">Buscar</button>
+      </div>
       <div id="achados" class="achados oculto"></div>
       <div id="escolhido" class="escolhido oculto">
         <span class="nome" id="escolhidoNome"></span>
@@ -224,6 +233,7 @@
       })
       .catch(function (e) { mostrar('Falha de rede: ' + e, 'erro'); });
   }
+  $('btBuscar').addEventListener('click', buscarConteudo);
   $('busca').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') { e.preventDefault(); buscarConteudo(); }
   });
