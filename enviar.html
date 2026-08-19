@@ -25,6 +25,27 @@
   }
   label { display:block; font-size:13px; color:var(--sub); margin:14px 0 6px; }
   .opcional { font-size:11px; opacity:.7; }
+  .abas { display:flex; gap:8px; margin-top:6px; }
+  .abas button {
+    flex:1; width:auto; margin:0; padding:10px 6px; font-size:13px; font-weight:700;
+    background:#23232f; border:1px solid #33333f; border-radius:10px; color:var(--sub);
+  }
+  .abas button.on { background:var(--vermelho); border-color:var(--vermelho); color:#fff; }
+  .oculto { display:none; }
+  .achados { margin-top:10px; border:1px solid #33333f; border-radius:10px; max-height:220px; overflow:auto; }
+  .achado { display:flex; align-items:center; gap:9px; padding:10px 12px; cursor:pointer;
+            border-bottom:1px solid #262633; }
+  .achado:last-child { border-bottom:none; }
+  .achado:hover { background:#23232f; }
+  .achado .nome { flex:1; font-size:13.5px; }
+  .achado .grupo { font-size:10px; font-weight:800; padding:3px 8px; border-radius:999px;
+                   background:rgba(229,9,20,.16); color:#ff8a90; }
+  .escolhido { display:flex; align-items:center; gap:9px; margin-top:10px;
+               background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.35);
+               border-radius:10px; padding:11px 13px; }
+  .escolhido .nome { flex:1; font-size:13.5px; color:#22C55E; font-weight:700; }
+  .escolhido button { width:auto; margin:0; padding:4px 9px; font-size:12px; background:none;
+                      border:1px solid #33333f; border-radius:8px; color:var(--sub); }
   input, textarea {
     width:100%; background:#15151f; border:1px solid #33333f; border-radius:12px;
     padding:14px; color:#fff; font-size:15px; outline:none; font-family:inherit;
@@ -70,6 +91,28 @@
     <label for="imagem">Imagem <span class="opcional">— opcional, link http(s)</span></label>
     <input id="imagem" type="url" placeholder="https://..." />
 
+    <label>Ao tocar na notificação <span class="opcional">— opcional</span></label>
+    <div class="abas">
+      <button type="button" id="abaNada" class="on">Nada</button>
+      <button type="button" id="abaLink">Abrir um link</button>
+      <button type="button" id="abaConteudo">Abrir conteúdo</button>
+    </div>
+
+    <div id="paineLink" class="oculto">
+      <label for="link">Link <span class="opcional">— ex.: a página do app na Play Store</span></label>
+      <input id="link" type="url" placeholder="https://play.google.com/store/apps/details?id=com.cinemeck.app" />
+    </div>
+
+    <div id="paineConteudo" class="oculto">
+      <label for="busca">Procure o filme, série ou anime</label>
+      <input id="busca" type="text" placeholder="Digite parte do título e aperte Enter" />
+      <div id="achados" class="achados oculto"></div>
+      <div id="escolhido" class="escolhido oculto">
+        <span class="nome" id="escolhidoNome"></span>
+        <button type="button" id="btTrocar">trocar</button>
+      </div>
+    </div>
+
     <div class="previa">
       <div class="rotulo">Prévia</div>
       <div class="pTitulo" id="pTitulo">CineMeck</div>
@@ -109,12 +152,90 @@
   });
   atualizarPrevia();
 
+  // ---------- destino do toque ----------
+  // Três estados exclusivos: nada, link de fora, ou uma tela do app. A rota
+  // nunca é digitada — sai da busca, que já devolve /movie/123 ou /series/456.
+  var destino = 'nada';
+  var rotaEscolhida = '';
+
+  function pintarAbas() {
+    $('abaNada').className = destino === 'nada' ? 'on' : '';
+    $('abaLink').className = destino === 'link' ? 'on' : '';
+    $('abaConteudo').className = destino === 'conteudo' ? 'on' : '';
+    $('paineLink').className = destino === 'link' ? '' : 'oculto';
+    $('paineConteudo').className = destino === 'conteudo' ? '' : 'oculto';
+  }
+  function irPara(qual) { destino = qual; pintarAbas(); }
+  $('abaNada').addEventListener('click', function () { irPara('nada'); });
+  $('abaLink').addEventListener('click', function () { irPara('link'); });
+  $('abaConteudo').addEventListener('click', function () { irPara('conteudo'); });
+
+  function limparEscolha() {
+    rotaEscolhida = '';
+    $('escolhido').className = 'escolhido oculto';
+    $('achados').className = 'achados oculto';
+    $('busca').value = '';
+    $('busca').focus();
+  }
+  $('btTrocar').addEventListener('click', limparEscolha);
+
+  function buscarConteudo() {
+    var termo = $('busca').value.trim();
+    if (termo.length < 2) { mostrar('Escreva ao menos 2 letras para buscar.', 'erro'); return; }
+    if (!senha.value.trim()) { mostrar('Digite a senha do painel antes de buscar.', 'erro'); senha.focus(); return; }
+
+    mostrar('Procurando...', '');
+    fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ senha: senha.value.trim(), acao: 'buscar_conteudo', termo: termo }),
+    })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (d) {
+        if (!d.ok) { mostrar(d.erro || 'Não deu para buscar.', 'erro'); return; }
+        var caixa = $('achados');
+        caixa.innerHTML = '';
+        if (!(d.achados || []).length) { mostrar('Nada encontrado com esse termo.', 'erro'); caixa.className = 'achados oculto'; return; }
+        mostrar('', '');
+
+        d.achados.forEach(function (a) {
+          var item = document.createElement('div');
+          item.className = 'achado';
+
+          var nome = document.createElement('span');
+          nome.className = 'nome';
+          nome.textContent = a.titulo + (a.ano ? ' (' + a.ano + ')' : '');
+
+          var grupo = document.createElement('span');
+          grupo.className = 'grupo';
+          grupo.textContent = a.grupo;
+
+          item.appendChild(nome);
+          item.appendChild(grupo);
+          item.addEventListener('click', function () {
+            rotaEscolhida = a.rota;
+            $('escolhidoNome').textContent = a.grupo + ' · ' + a.titulo;
+            $('escolhido').className = 'escolhido';
+            caixa.className = 'achados oculto';
+          });
+          caixa.appendChild(item);
+        });
+        caixa.className = 'achados';
+      })
+      .catch(function (e) { mostrar('Falha de rede: ' + e, 'erro'); });
+  }
+  $('busca').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); buscarConteudo(); }
+  });
+
   botao.addEventListener('click', function () {
     var corpo = {
       senha: senha.value.trim(),
       titulo: titulo.value.trim() || 'CineMeck',
       mensagem: mensagem.value.trim(),
       imagem: imagem.value.trim(),
+      link: destino === 'link' ? $('link').value.trim() : '',
+      rota: destino === 'conteudo' ? rotaEscolhida : '',
     };
 
     if (!corpo.senha) { mostrar('Digite a senha do painel.', 'erro'); senha.focus(); return; }
@@ -124,8 +245,22 @@
       imagem.focus(); return;
     }
 
+    if (destino === 'link' && !/^https?:\/\//i.test(corpo.link)) {
+      mostrar('O link precisa começar com http:// ou https://', 'erro');
+      $('link').focus(); return;
+    }
+    if (destino === 'conteudo' && !corpo.rota) {
+      mostrar('Procure e escolha o conteúdo na lista.', 'erro');
+      $('busca').focus(); return;
+    }
+
     // Envio atinge todos os usuários e não tem volta: confirma antes.
-    if (!confirm('Enviar esta notificação para TODOS os usuários?\n\n' + corpo.titulo + '\n' + corpo.mensagem)) return;
+    var aondeVai = corpo.rota
+      ? '\n\nAo tocar: abre ' + $('escolhidoNome').textContent
+      : corpo.link
+        ? '\n\nAo tocar: abre ' + corpo.link
+        : '';
+    if (!confirm('Enviar esta notificação para TODOS os usuários?\n\n' + corpo.titulo + '\n' + corpo.mensagem + aondeVai)) return;
 
     botao.disabled = true;
     mostrar('Enviando...', '');

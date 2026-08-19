@@ -39,8 +39,8 @@
   .msg { font-size:13px; margin-top:12px; line-height:1.6; white-space:pre-wrap; min-height:18px; }
   .ok { color:#22C55E; } .erro { color:#ff6b6b; }
   .oculto { display:none; }
-  .numeros { display:flex; gap:12px; text-align:center; }
-  .numeros > div { flex:1; background:var(--campo); border-radius:12px; padding:14px 8px; }
+  .numeros { display:flex; flex-wrap:wrap; gap:12px; text-align:center; }
+  .numeros > div { flex:1 1 90px; background:var(--campo); border-radius:12px; padding:14px 8px; }
   .numeros .n { font-size:24px; font-weight:900; }
   .numeros .r { font-size:11px; color:var(--sub); margin-top:2px; }
   .caixaCodigos {
@@ -65,6 +65,24 @@
   .lixeira:hover { background:rgba(255,107,107,.12); }
   .off { background:rgba(255,107,107,.15); color:#ff6b6b; }
   .cod .pct { font-size:13px; font-weight:800; color:#22C55E; }
+  .grupoPedidos { font-size:12px; font-weight:800; color:var(--sub); letter-spacing:.5px;
+                  margin:18px 0 8px; text-transform:uppercase; }
+  .grupoPedidos:first-child { margin-top:10px; }
+  .ped { display:block; padding:12px 13px; border-bottom:1px solid #262633; }
+  .ped:last-child { border-bottom:none; }
+  .pedTopo { display:flex; align-items:center; gap:8px; }
+  .pedTitulo { flex:1; font-size:14px; font-weight:700; }
+  .pedInfo { font-size:12px; color:var(--sub); margin-top:5px; line-height:1.5; word-break:break-word; }
+  .pedBotoes { display:flex; gap:8px; margin-top:10px; }
+  .pedBotoes button { width:auto; margin:0; padding:6px 12px; font-size:12px; border-radius:8px; }
+  .btAtender { background:#2f2f3d; }
+  .concluido { background:rgba(34,197,94,.15); color:#22C55E; }
+  .pendente { background:rgba(245,197,24,.15); color:#F5C518; }
+  .rejeitado { background:rgba(255,107,107,.15); color:#ff6b6b; }
+  .pedEps { font-size:12.5px; color:#8ab4ff; margin-top:6px; font-weight:600; }
+  .btConcluir { background:#1d4a30; }
+  .btRejeitar { background:#4a2a30; }
+  .btVoltar { background:#2f2f3d; }
   .aviso { font-size:12px; color:var(--sub); line-height:1.5; margin-top:10px; }
   .marcador { display:flex; align-items:center; gap:8px; margin-top:14px; }
   .marcador input { width:auto; }
@@ -94,6 +112,7 @@
         <div><div class="n" id="nLivres">—</div><div class="r">códigos livres</div></div>
         <div><div class="n" id="nUsados">—</div><div class="r">já usados</div></div>
         <div><div class="n" id="nCupons">—</div><div class="r">cupons ativos</div></div>
+        <div><div class="n" id="nPedidos">—</div><div class="r">pedidos abertos</div></div>
       </div>
     </div>
 
@@ -147,6 +166,21 @@
       <div class="msg" id="msgCupons"></div>
       <div class="caixaCodigos oculto" id="caixaCupons"></div>
       <button class="secundario" id="btListarCupons">Ver os cupons</button>
+    </div>
+
+    <!-- ===== pedidos do pessoal ===== -->
+    <div class="card">
+      <h2>Pedidos do pessoal</h2>
+      <div class="aviso" style="margin-top:0">
+        O que pedem pela tela de pedidos do app, separado por tipo.
+      </div>
+      <div class="marcador">
+        <input id="pedSoPendentes" type="checkbox" checked />
+        <label for="pedSoPendentes">Mostrar só os que faltam atender</label>
+      </div>
+      <button class="secundario" id="btListarPedidos">Ver os pedidos</button>
+      <div class="msg" id="msgPedidos"></div>
+      <div class="caixaCodigos oculto" id="caixaPedidos" style="max-height:420px"></div>
     </div>
 
     <!-- ===== versao do app ===== -->
@@ -229,6 +263,7 @@
     $('nLivres').textContent = d.codigos_livres;
     $('nUsados').textContent = d.codigos_usados;
     $('nCupons').textContent = d.cupons_ativos != null ? d.cupons_ativos : '—';
+    $('nPedidos').textContent = d.pedidos_pendentes != null ? d.pedidos_pendentes : '—';
   }
   function atualizarResumo() { chamar('resumo').then(function (d) { if (d.ok) pintarResumo(d); }); }
 
@@ -418,6 +453,159 @@
     });
   }
   $('btListarCupons').addEventListener('click', listarCupons);
+
+  // ----- pedidos do pessoal -----
+  function dataHora(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function linhaPedido(p, caixa) {
+    var linha = document.createElement('div');
+    linha.className = 'ped';
+
+    var topo = document.createElement('div');
+    topo.className = 'pedTopo';
+
+    var tit = document.createElement('div');
+    tit.className = 'pedTitulo';
+    tit.textContent = p.titulo + (p.ano ? ' (' + p.ano + ')' : '');
+
+    var selo = document.createElement('span');
+    var st = p.status || 'pendente';
+    selo.className = 'selo ' + st;
+    selo.textContent = st === 'concluido' ? 'concluído' : st === 'rejeitado' ? 'rejeitado' : 'pendente';
+
+    topo.appendChild(tit);
+    topo.appendChild(selo);
+    linha.appendChild(topo);
+
+    // Episódios em destaque: é o que decide o que baixar.
+    if (p.episodios) {
+      var eps = document.createElement('div');
+      eps.className = 'pedEps';
+      eps.textContent = 'Episódios: ' + p.episodios;
+      linha.appendChild(eps);
+    }
+
+    var info = document.createElement('div');
+    info.className = 'pedInfo';
+    var partes = [dataHora(p.criado_em)];
+    if (p.email) partes.push(p.email);
+    if (p.detalhes) partes.push(p.detalhes);
+    if (!p.tem_dono) partes.push('sem conta — não dá para avisar');
+    info.textContent = partes.join(' · ');
+    linha.appendChild(info);
+
+    var botoes = document.createElement('div');
+    botoes.className = 'pedBotoes';
+
+    function botaoStatus(texto, classe, novo, confirmar) {
+      var bt = document.createElement('button');
+      bt.className = classe;
+      bt.textContent = texto;
+      bt.addEventListener('click', function () {
+        if (confirmar && !confirm(confirmar)) return;
+        bt.disabled = true;
+        chamar('atualizar_pedido', { id: p.id, status: novo }).then(function (r) {
+          if (!r.ok) {
+            mostrar($('msgPedidos'), r.erro || 'Não deu para atualizar.', 'erro');
+            bt.disabled = false;
+            return;
+          }
+          // Só concluir dispara aviso, e só para quem tem conta.
+          if (novo === 'concluido') {
+            mostrar(
+              $('msgPedidos'),
+              r.avisado
+                ? 'Concluído e avisei quem pediu.'
+                : 'Concluído. Aviso não saiu: ' + (r.aviso_erro || 'motivo desconhecido') + '.',
+              r.avisado ? 'ok' : 'erro'
+            );
+          } else {
+            mostrar($('msgPedidos'), 'Pedido atualizado.', 'ok');
+          }
+          atualizarResumo();
+          listarPedidos();
+        });
+      });
+      return bt;
+    }
+
+    if (st !== 'concluido') {
+      botoes.appendChild(botaoStatus(
+        'concluir', 'btConcluir', 'concluido',
+        p.tem_dono
+          ? 'Marcar "' + p.titulo + '" como concluído?\n\nQuem pediu recebe uma notificação.'
+          : 'Marcar "' + p.titulo + '" como concluído?\n\nEste pedido não tem conta ligada, então ninguém será avisado.'
+      ));
+    }
+    if (st !== 'rejeitado') {
+      botoes.appendChild(botaoStatus('rejeitar', 'btRejeitar', 'rejeitado', null));
+    }
+    if (st !== 'pendente') {
+      botoes.appendChild(botaoStatus('voltar p/ pendente', 'btVoltar', 'pendente', null));
+    }
+
+    var lix = document.createElement('button');
+    lix.className = 'lixeira';
+    lix.title = 'Excluir';
+    lix.textContent = '\u2715';
+    lix.addEventListener('click', function () {
+      if (!confirm('Excluir o pedido de "' + p.titulo + '"?')) return;
+      lix.disabled = true;
+      chamar('excluir_pedido', { id: p.id }).then(function (r) {
+        if (!r.ok) { mostrar($('msgPedidos'), r.erro || 'Não deu para excluir.', 'erro'); lix.disabled = false; return; }
+        linha.remove();
+        atualizarResumo();
+      });
+    });
+
+    botoes.appendChild(lix);
+    linha.appendChild(botoes);
+
+    caixa.appendChild(linha);
+  }
+
+  function listarPedidos() {
+    var caixa = $('caixaPedidos');
+    $('btListarPedidos').disabled = true;
+    chamar('listar_pedidos', { so_pendentes: $('pedSoPendentes').checked }).then(function (d) {
+      if (!d.ok) { mostrar($('msgPedidos'), d.erro || 'Não deu para listar.', 'erro'); return; }
+      caixa.innerHTML = '';
+
+      var grupos = [
+        ['Filmes', d.filmes || []],
+        ['Séries', d.series || []],
+        ['Animes', d.animes || []]
+      ];
+
+      var algum = false;
+      grupos.forEach(function (g) {
+        var titulo = document.createElement('div');
+        titulo.className = 'grupoPedidos';
+        titulo.textContent = g[0] + ' (' + g[1].length + ')';
+        caixa.appendChild(titulo);
+
+        if (!g[1].length) {
+          var vazio = document.createElement('div');
+          vazio.className = 'ped';
+          vazio.innerHTML = '<div class="pedInfo" style="margin:0">Nenhum pedido aqui.</div>';
+          caixa.appendChild(vazio);
+          return;
+        }
+        algum = true;
+        g[1].forEach(function (p) { linhaPedido(p, caixa); });
+      });
+
+      mostrar($('msgPedidos'), algum ? '' : 'Nada pedido por enquanto.', '');
+      caixa.classList.remove('oculto');
+    }).catch(function (e) {
+      mostrar($('msgPedidos'), 'Falha de rede: ' + e, 'erro');
+    }).then(function () { $('btListarPedidos').disabled = false; });
+  }
+  $('btListarPedidos').addEventListener('click', listarPedidos);
 
   // ----- versão do app -----
   function carregarConfig() {
