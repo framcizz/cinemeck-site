@@ -38,6 +38,9 @@
   .linha > * { flex:1; }
   .msg { font-size:13px; margin-top:12px; line-height:1.6; white-space:pre-wrap; min-height:18px; }
   .ok { color:#22C55E; } .erro { color:#ff6b6b; }
+  .nota { font-size:12px; color:var(--sub); margin:-4px 0 14px; line-height:1.5; }
+  .cod .quem { flex:1; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cod .valor { font-size:14px; font-weight:800; color:#22C55E; }
   .oculto { display:none; }
   .numeros { display:flex; flex-wrap:wrap; gap:12px; text-align:center; }
   .numeros > div { flex:1 1 90px; background:var(--campo); border-radius:12px; padding:14px 8px; }
@@ -114,6 +117,25 @@
         <div><div class="n" id="nCupons">—</div><div class="r">cupons ativos</div></div>
         <div><div class="n" id="nPedidos">—</div><div class="r">pedidos abertos</div></div>
       </div>
+    </div>
+
+    <!-- ===== assinaturas ===== -->
+    <div class="card">
+      <h2>Assinaturas</h2>
+      <p class="nota">
+        Só quem pagou. O “VIPs ativos” ali em cima conta também quem entrou por
+        código de resgate, que não passou pelo caixa.
+      </p>
+      <div class="numeros">
+        <div><div class="n" id="aAtivos">—</div><div class="r">assinantes ativos</div></div>
+        <div><div class="n" id="aVendas">—</div><div class="r">vendas</div></div>
+        <div><div class="n" id="aReceita">—</div><div class="r">receita total</div></div>
+        <div><div class="n" id="aReceita30">—</div><div class="r">últimos 30 dias</div></div>
+        <div><div class="n" id="aPendentes">—</div><div class="r">PIX não pagos</div></div>
+        <div><div class="n" id="aConv">—</div><div class="r">conversão</div></div>
+      </div>
+      <div class="caixaCodigos" id="caixaAssinaturas"></div>
+      <div class="msg" id="msgAssinaturas"></div>
     </div>
 
     <!-- ===== codigos vip ===== -->
@@ -218,6 +240,10 @@
 <script>
 (function () {
   var API = 'https://hulydzwtxomswogbdnap.supabase.co/functions/v1/painel-admin';
+  // Assinaturas moram em outra funcao: mexer no painel-admin, que cuida de
+  // codigos, cupons, pedidos e config, seria arriscar quatro coisas que
+  // funcionam por causa de uma nova.
+  var API_ASSIN = 'https://hulydzwtxomswogbdnap.supabase.co/functions/v1/painel-assinaturas';
   var $ = function (id) { return document.getElementById(id); };
   var senhaAtual = '';
 
@@ -228,9 +254,12 @@
 
   // A senha fica só em memória: nada de localStorage, senão ela sobreviveria
   // à aba fechada em qualquer computador onde o painel foi aberto.
-  function chamar(acao, extra) {
+  function chamar(acao, extra) { return chamarEm(API, acao, extra); }
+  function chamarAssin(acao, extra) { return chamarEm(API_ASSIN, acao, extra); }
+
+  function chamarEm(url, acao, extra) {
     var corpo = Object.assign({ senha: senhaAtual, acao: acao }, extra || {});
-    return fetch(API, {
+    return fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(corpo),
@@ -250,6 +279,7 @@
       $('painel').classList.remove('oculto');
       pintarResumo(d);
       carregarConfig();
+      carregarAssinaturas();
     }).catch(function (e) {
       senhaAtual = '';
       mostrar($('msgEntrar'), 'Erro de rede: ' + e, 'erro');
@@ -266,6 +296,69 @@
     $('nPedidos').textContent = d.pedidos_pendentes != null ? d.pedidos_pendentes : '—';
   }
   function atualizarResumo() { chamar('resumo').then(function (d) { if (d.ok) pintarResumo(d); }); }
+
+  // ----- assinaturas -----
+  function brl(v) {
+    return 'R$ ' + Number(v || 0).toFixed(2).replace('.', ',');
+  }
+
+  function dataCurta(iso) {
+    if (!iso) return '—';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('pt-BR') + ' ' +
+           d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function carregarAssinaturas() {
+    chamarAssin('resumo').then(function (d) {
+      if (!d.ok) { mostrar($('msgAssinaturas'), d.erro || 'Não deu para ler as assinaturas.', 'erro'); return; }
+      $('aAtivos').textContent = d.assinantes_ativos;
+      $('aVendas').textContent = d.vendas;
+      $('aReceita').textContent = brl(d.receita_total);
+      $('aReceita30').textContent = brl(d.receita_30d);
+      $('aPendentes').textContent = d.pix_pendentes;
+      $('aConv').textContent = d.conversao_pct + '%';
+      mostrar($('msgAssinaturas'), '', '');
+    }).catch(function (e) {
+      mostrar($('msgAssinaturas'), 'Erro de rede: ' + e, 'erro');
+    });
+
+    chamarAssin('listar').then(function (d) {
+      var caixa = $('caixaAssinaturas');
+      if (!d.ok) return;
+      caixa.innerHTML = '';
+      var lista = d.assinaturas || [];
+      if (lista.length === 0) {
+        var vazio = document.createElement('div');
+        vazio.className = 'cod';
+        vazio.innerHTML = '<div class="quem" style="opacity:.6">Nenhuma assinatura paga ainda.</div>';
+        caixa.appendChild(vazio);
+        return;
+      }
+      lista.forEach(function (a) {
+        var linha = document.createElement('div');
+        linha.className = 'cod';
+
+        var quem = document.createElement('div');
+        quem.className = 'quem';
+        quem.textContent = a.email || 'sem e-mail';
+        var sob = document.createElement('div');
+        sob.className = 'dias';
+        sob.textContent = dataCurta(a.pago_em) + ' · ' + a.plano_dias + ' dias' +
+                          (a.cupom ? ' · cupom ' + a.cupom : '');
+        quem.appendChild(sob);
+
+        var valor = document.createElement('div');
+        valor.className = 'valor';
+        valor.textContent = brl(a.valor);
+
+        linha.appendChild(quem);
+        linha.appendChild(valor);
+        caixa.appendChild(linha);
+      });
+    });
+  }
 
   // ----- códigos -----
   $('btGerar').addEventListener('click', function () {
