@@ -41,6 +41,15 @@
   .nota { font-size:12px; color:var(--sub); margin:-4px 0 14px; line-height:1.5; }
   .cod .quem { flex:1; font-size:13px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cod .valor { font-size:14px; font-weight:800; color:#22C55E; }
+  .buscaLinha { display:flex; gap:8px; align-items:stretch; }
+  .buscaLinha input { flex:1; }
+  .btLupa { width:auto; margin:0; padding:0 16px; font-size:17px; border-radius:12px; }
+  .abas { display:flex; gap:8px; margin-top:12px; }
+  .aba { flex:1; margin:0; background:#2f2f3d; font-size:13px; padding:10px; border-radius:10px; }
+  .aba.on { background:var(--vermelho); }
+  .vipSelo { background:rgba(229,9,20,.18); color:#ff6b6b; }
+  .btVip { background:none; border:1px solid var(--borda); color:var(--sub);
+           width:auto; margin:0; padding:5px 10px; font-size:11px; border-radius:8px; }
   .oculto { display:none; }
   .numeros { display:flex; flex-wrap:wrap; gap:12px; text-align:center; }
   .numeros > div { flex:1 1 90px; background:var(--campo); border-radius:12px; padding:14px 8px; }
@@ -117,6 +126,29 @@
         <div><div class="n" id="nCupons">—</div><div class="r">cupons ativos</div></div>
         <div><div class="n" id="nPedidos">—</div><div class="r">pedidos abertos</div></div>
       </div>
+    </div>
+
+    <!-- ===== cadastros ===== -->
+    <div class="card">
+      <h2>Cadastros</h2>
+      <div class="numeros">
+        <div><div class="n" id="cTotal">—</div><div class="r">contas</div></div>
+        <div><div class="n" id="cNovos">—</div><div class="r">últimos 7 dias</div></div>
+        <div><div class="n" id="cMostrando">—</div><div class="r">na lista</div></div>
+      </div>
+
+      <div class="buscaLinha" style="margin-top:14px">
+        <input id="buscaEmail" type="text" placeholder="Procurar e-mail..." autocomplete="off" />
+        <button class="btLupa" id="btBuscar" title="Procurar">🔍</button>
+      </div>
+
+      <div class="abas">
+        <button class="aba on" id="abaRecentes">Mais recentes</button>
+        <button class="aba" id="abaAntigos">Ordem de chegada</button>
+      </div>
+
+      <div class="caixaCodigos" id="caixaCadastros"></div>
+      <div class="msg" id="msgCadastros"></div>
     </div>
 
     <!-- ===== assinaturas ===== -->
@@ -280,6 +312,7 @@
       pintarResumo(d);
       carregarConfig();
       carregarAssinaturas();
+      carregarCadastros();
     }).catch(function (e) {
       senhaAtual = '';
       mostrar($('msgEntrar'), 'Erro de rede: ' + e, 'erro');
@@ -296,6 +329,105 @@
     $('nPedidos').textContent = d.pedidos_pendentes != null ? d.pedidos_pendentes : '—';
   }
   function atualizarResumo() { chamar('resumo').then(function (d) { if (d.ok) pintarResumo(d); }); }
+
+  // ----- cadastros -----
+  var ordemCadastros = 'recentes';
+
+  function pintarOrdem() {
+    $('abaRecentes').className = 'aba' + (ordemCadastros === 'recentes' ? ' on' : '');
+    $('abaAntigos').className = 'aba' + (ordemCadastros === 'antigos' ? ' on' : '');
+  }
+
+  function carregarCadastros() {
+    var busca = $('buscaEmail').value.trim();
+    mostrar($('msgCadastros'), 'Carregando...', '');
+    chamarAssin('cadastros', { busca: busca, ordem: ordemCadastros, limite: 1000 })
+      .then(function (d) {
+        if (!d.ok) { mostrar($('msgCadastros'), d.erro || 'Não deu para listar.', 'erro'); return; }
+
+        $('cTotal').textContent = d.total;
+        $('cNovos').textContent = d.novos_7d;
+        $('cMostrando').textContent = d.mostrando;
+
+        var caixa = $('caixaCadastros');
+        caixa.innerHTML = '';
+        var lista = d.cadastros || [];
+
+        if (lista.length === 0) {
+          var vazio = document.createElement('div');
+          vazio.className = 'cod';
+          vazio.innerHTML = '<div class="quem" style="opacity:.6">Nenhuma conta encontrada.</div>';
+          caixa.appendChild(vazio);
+          mostrar($('msgCadastros'), '', '');
+          return;
+        }
+
+        lista.forEach(function (u) {
+          var linha = document.createElement('div');
+          linha.className = 'cod';
+
+          var quem = document.createElement('div');
+          quem.className = 'quem';
+          quem.textContent = u.email || 'sem e-mail';
+          var sob = document.createElement('div');
+          sob.className = 'dias';
+          sob.textContent = (u.nome ? u.nome + ' · ' : '') + dataCurta(u.criado_em);
+          quem.appendChild(sob);
+          linha.appendChild(quem);
+
+          var vipVale = u.vip_ate && new Date(u.vip_ate) > new Date();
+          if (vipVale) {
+            var selo = document.createElement('span');
+            selo.className = 'selo vipSelo';
+            selo.textContent = 'VIP até ' + new Date(u.vip_ate).toLocaleDateString('pt-BR');
+            linha.appendChild(selo);
+          }
+
+          var bt = document.createElement('button');
+          bt.className = 'btVip';
+          bt.textContent = vipVale ? '+ dias' : 'Dar VIP';
+          bt.addEventListener('click', function () { darVip(u.email, vipVale); });
+          linha.appendChild(bt);
+
+          caixa.appendChild(linha);
+        });
+
+        mostrar($('msgCadastros'), '', '');
+      })
+      .catch(function (e) { mostrar($('msgCadastros'), 'Erro de rede: ' + e, 'erro'); });
+  }
+
+  // Some sobre o VIP que a pessoa ja tem, se ainda estiver valendo -- por
+  // isso o botao vira "+ dias" para quem ja e VIP.
+  function darVip(email, jaEra) {
+    var txt = prompt(
+      (jaEra ? 'Somar quantos dias de VIP para ' : 'Quantos dias de VIP para ') + email + '?',
+      '30'
+    );
+    if (txt === null) return;
+    var dias = parseInt(txt, 10);
+    if (!dias || dias < 1) { mostrar($('msgCadastros'), 'Informe um número de dias válido.', 'erro'); return; }
+
+    mostrar($('msgCadastros'), 'Liberando...', '');
+    chamarAssin('dar_vip', { email: email, dias: dias }).then(function (d) {
+      if (!d.ok) { mostrar($('msgCadastros'), d.erro || 'Não deu para liberar.', 'erro'); return; }
+      mostrar($('msgCadastros'),
+        'VIP de ' + email + ' vai até ' + dataCurta(d.vip_ate) + '.', 'ok');
+      carregarCadastros();
+      atualizarResumo();
+    }).catch(function (e) { mostrar($('msgCadastros'), 'Erro de rede: ' + e, 'erro'); });
+  }
+
+  $('btBuscar').addEventListener('click', carregarCadastros);
+  $('buscaEmail').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') carregarCadastros();
+  });
+  $('abaRecentes').addEventListener('click', function () {
+    ordemCadastros = 'recentes'; pintarOrdem(); carregarCadastros();
+  });
+  $('abaAntigos').addEventListener('click', function () {
+    ordemCadastros = 'antigos'; pintarOrdem(); carregarCadastros();
+  });
 
   // ----- assinaturas -----
   function brl(v) {
