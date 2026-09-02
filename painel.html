@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CineMeck · Painel</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d0d14;--card:#15151f;--linha:#23232f;--txt:#e8e8f0;--fraco:#8a8a99;--vermelho:#E50914;--verde:#22C55E;--amarelo:#FFC531}
+body{background:var(--bg);color:var(--txt);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:20px;max-width:1200px;margin:0 auto}
+h1{font-size:22px;margin-bottom:4px}
+.sub{color:var(--fraco);font-size:13px;margin-bottom:20px}
+.login{max-width:340px;margin:14vh auto;text-align:center}
+input,select,textarea,button{font:inherit;border-radius:9px;border:1px solid var(--linha);background:#1b1b26;color:var(--txt);padding:10px 12px;outline:none}
+input:focus,select:focus{border-color:var(--vermelho)}
+button{cursor:pointer;border-color:transparent;background:var(--vermelho);color:#fff;font-weight:700}
+button:hover{filter:brightness(1.1)}
+button.sec{background:#22222e;color:var(--txt);font-weight:600}
+button.mini{padding:6px 10px;font-size:12px}
+.abas{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1px solid var(--linha);padding-bottom:10px}
+.abas button{background:transparent;color:var(--fraco);font-weight:600;padding:8px 13px}
+.abas button.on{background:var(--vermelho);color:#fff}
+.grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:12px;margin-bottom:22px}
+.kpi{background:var(--card);border:1px solid var(--linha);border-radius:13px;padding:15px}
+.kpi .n{font-size:26px;font-weight:800;line-height:1.2}
+.kpi .r{color:var(--fraco);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
+.kpi .e{color:var(--fraco);font-size:11px;margin-top:6px}
+.card{background:var(--card);border:1px solid var(--linha);border-radius:13px;padding:16px;margin-bottom:16px}
+.card h2{font-size:15px;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--fraco);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:8px 10px;border-bottom:1px solid var(--linha)}
+td{padding:9px 10px;border-bottom:1px solid #1c1c26}
+tr:last-child td{border-bottom:none}
+.linha{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.tag.ok{background:rgba(34,197,94,.15);color:var(--verde)}
+.tag.no{background:rgba(229,9,20,.15);color:var(--vermelho)}
+.tag.q{background:rgba(255,197,49,.15);color:var(--amarelo)}
+.aviso{padding:11px 13px;border-radius:9px;font-size:13px;margin-bottom:12px}
+.aviso.erro{background:rgba(229,9,20,.12);color:#ff8b91}
+.aviso.bom{background:rgba(34,197,94,.12);color:#7ee2a8}
+.vazio{color:var(--fraco);text-align:center;padding:26px;font-size:13px}
+.esc{overflow-x:auto}
+.oculto{display:none}
+</style></head><body>
+
+<div id="login" class="login">
+  <h1>CineMeck</h1><p class="sub">Painel do dono &middot; acompanhamento</p>
+  <div class="linha" style="flex-direction:column">
+    <input id="senha" type="password" placeholder="Senha do painel" style="width:100%" autofocus>
+    <button onclick="entrar()" style="width:100%">Entrar</button>
+  </div>
+  <div id="loginErro"></div>
+  <p class="sub" style="margin-top:22px;font-size:12px">
+    Códigos VIP, cupons, pedidos e notificações ficam no
+    <a href="admin.html" style="color:var(--vermelho)">painel de administração</a>.
+  </p>
+</div>
+
+<div id="app" class="oculto">
+  <h1>CineMeck</h1><p class="sub">Painel do dono · <span id="agora"></span></p>
+  <div class="abas" id="abas"></div>
+  <div id="conteudo"></div>
+</div>
+
+<script>
+// Endereco absoluto: esta pagina nao e mais servida pela funcao (o
+// Supabase forca text/plain e CSP sandbox em Edge Function, entao HTML
+// nunca renderiza la). Abrindo de qualquer origem funciona porque a
+// funcao responde com Access-Control-Allow-Origin: *.
+const API = 'https://hulydzwtxomswogbdnap.supabase.co/functions/v1/painel-admin';
+let SENHA = sessionStorage.getItem('cm_senha') || '';
+
+async function chamar(acao, extra) {
+  const r = await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ senha: SENHA, acao }, extra || {})),
+  });
+  const j = await r.json().catch(() => ({ ok: false, erro: 'resposta invalida' }));
+  if (!j.ok) throw new Error(j.erro || 'erro');
+  return j;
+}
+
+function esc(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function num(v) { return (Number(v) || 0).toLocaleString('pt-BR'); }
+function dinheiro(v) { return 'R$ ' + (Number(v) || 0).toFixed(2).replace('.', ','); }
+function data(v) { return v ? new Date(v).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—'; }
+function dia(v) { return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
+
+async function entrar() {
+  SENHA = document.getElementById('senha').value.trim();
+  const box = document.getElementById('loginErro');
+  box.innerHTML = '';
+  try {
+    await chamar('metricas');
+    sessionStorage.setItem('cm_senha', SENHA);
+    document.getElementById('login').classList.add('oculto');
+    document.getElementById('app').classList.remove('oculto');
+    document.getElementById('agora').textContent = new Date().toLocaleString('pt-BR');
+    montarAbas();
+    abrir('visao');
+  } catch (e) {
+    box.innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>';
+  }
+}
+document.getElementById('senha').addEventListener('keydown', function (e) { if (e.key === 'Enter') entrar(); });
+
+const ABAS = [
+  ['visao', 'Visão geral'],
+  ['conteudo', 'Mais assistidos'],
+  ['notas', 'Avaliações'],
+  ['pessoas', 'Usuários e VIP'],
+  ['moderacao', 'Moderação'],
+  ['saude', 'Saúde'],
+];
+let abaAtual = 'visao';
+
+function montarAbas() {
+  document.getElementById('abas').innerHTML = ABAS.map(function (a) {
+    return '<button id="aba-' + a[0] + '" onclick="abrir(\'' + a[0] + '\')">' + a[1] + '</button>';
+  }).join('');
+}
+
+async function abrir(nome) {
+  abaAtual = nome;
+  ABAS.forEach(function (a) {
+    const b = document.getElementById('aba-' + a[0]);
+    if (b) b.className = a[0] === nome ? 'on' : '';
+  });
+  const c = document.getElementById('conteudo');
+  c.innerHTML = '<div class="vazio">Carregando…</div>';
+  try {
+    if (nome === 'visao') return await visao(c);
+    if (nome === 'conteudo') return await topConteudo(c);
+    if (nome === 'notas') return await topNotas(c);
+    if (nome === 'pessoas') return pessoas(c);
+    if (nome === 'moderacao') return await moderacao(c);
+    if (nome === 'saude') return await saude(c);
+  } catch (e) {
+    c.innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>';
+  }
+}
+
+function kpi(n, r, extra) {
+  return '<div class="kpi"><div class="n">' + n + '</div><div class="r">' + r + '</div>'
+    + (extra ? '<div class="e">' + extra + '</div>' : '') + '</div>';
+}
+
+async function visao(c) {
+  const m = (await chamar('metricas')).metricas;
+  const u = m.usuarios || {}, v = m.vip || {}, d = m.dinheiro || {}, cat = m.catalogo || {}, e = m.engajamento || {};
+  let h = '<div class="grade">'
+    + kpi(num(u.total), 'Usuários', '+' + num(u.novos_7d) + ' em 7 dias')
+    + kpi(num(u.ativos_7d), 'Ativos (7 dias)', num(u.ativos_30d) + ' em 30 dias')
+    + kpi(num(v.ativos), 'VIPs ativos', num(v.vencendo_7d) + ' vencem em 7 dias')
+    + kpi(dinheiro(d.pago_30d), 'Recebido (30 dias)', dinheiro(d.pago_total) + ' no total')
+    + kpi(num(d.pendentes), 'Pix pendentes')
+    + kpi(num(e.avaliacoes), 'Avaliações', num(e.comentarios) + ' comentários')
+    + '</div>';
+
+  h += '<div class="card"><h2>Catálogo</h2><div class="grade" style="margin:0">'
+    + kpi(num(cat.filmes), 'Filmes') + kpi(num(cat.series), 'Séries')
+    + kpi(num(cat.animes), 'Animes') + kpi(num(cat.doramas), 'Doramas')
+    + '</div></div>';
+
+  h += '<div class="card"><h2>Versões instaladas</h2><div class="esc"><table>'
+    + '<tr><th>Versão</th><th>Ativos (7 dias)</th><th>Total</th></tr>'
+    + (m.versoes || []).map(function (x) {
+        return '<tr><td>' + esc(x.versao) + '</td><td><b>' + num(x.ativos_7d) + '</b></td><td>' + num(x.total) + '</td></tr>';
+      }).join('')
+    + '</table></div>'
+    + '<div class="e" style="color:var(--fraco);font-size:12px;margin-top:10px">'
+    + 'Ligar “exigir versão” derruba quem aparece como “sem cabeçalho”: são APKs antigos demais para mandar a versão.'
+    + '</div></div>';
+  c.innerHTML = h;
+}
+
+async function topConteudo(c) {
+  const dias = Number(sessionStorage.getItem('cm_dias') || 30);
+  const r = await chamar('top_conteudo', { dias: dias, limite: 30 });
+  let h = '<div class="card"><h2>Mais assistidos</h2><div class="linha">'
+    + [7, 30, 90].map(function (d) {
+        return '<button class="mini ' + (d === dias ? '' : 'sec') + '" onclick="verDias(' + d + ')">' + d + ' dias</button>';
+      }).join('')
+    + '</div><div class="esc"><table><tr><th>#</th><th>Título</th><th>Tipo</th><th>Pessoas</th><th>Progresso médio</th></tr>'
+    + (r.itens || []).map(function (x, i) {
+        return '<tr><td>' + (i + 1) + '</td><td>' + esc(x.title || x.item_id) + '</td>'
+          + '<td>' + (x.tipo === 'series' ? 'Série' : 'Filme') + '</td>'
+          + '<td><b>' + num(x.pessoas) + '</b></td><td>' + num(x.media_pct) + '%</td></tr>';
+      }).join('')
+    + '</table></div>'
+    + ((r.itens || []).length ? '' : '<div class="vazio">Ninguém assistiu nada nesse período.</div>')
+    + '</div>';
+  c.innerHTML = h;
+}
+function verDias(d) { sessionStorage.setItem('cm_dias', d); abrir('conteudo'); }
+
+async function topNotas(c) {
+  const r = await chamar('top_avaliados', { min_votos: 1, limite: 40 });
+  const itens = r.itens || [];
+  c.innerHTML = '<div class="card"><h2>Melhores avaliados</h2>'
+    + (itens.length
+      ? '<div class="esc"><table><tr><th>#</th><th>Tipo</th><th>Id</th><th>Nota</th><th>Votos</th></tr>'
+        + itens.map(function (x, i) {
+            return '<tr><td>' + (i + 1) + '</td><td>' + (x.media_type === 'tv' ? 'Série' : 'Filme') + '</td>'
+              + '<td>' + esc(x.item_id) + '</td>'
+              + '<td><b style="color:var(--amarelo)">' + Number(x.media).toFixed(1).replace('.', ',') + '</b></td>'
+              + '<td>' + num(x.votos) + '</td></tr>';
+          }).join('') + '</table></div>'
+      : '<div class="vazio">Ainda não há avaliações. Elas aparecem aqui assim que a primeira pessoa votar no app.</div>')
+    + '</div>';
+}
+
+function pessoas(c) {
+  c.innerHTML = '<div class="card"><h2>Buscar usuário</h2>'
+    + '<div class="linha"><input id="busca" placeholder="parte do email (3+ letras)" style="flex:1;min-width:220px">'
+    + '<button onclick="buscar()">Buscar</button></div><div id="res"></div></div>';
+  const i = document.getElementById('busca');
+  i.addEventListener('keydown', function (e) { if (e.key === 'Enter') buscar(); });
+  i.focus();
+}
+
+async function buscar() {
+  const box = document.getElementById('res');
+  box.innerHTML = '<div class="vazio">Procurando…</div>';
+  try {
+    const r = await chamar('buscar_usuario', { termo: document.getElementById('busca').value });
+    const us = r.usuarios || [];
+    if (!us.length) { box.innerHTML = '<div class="vazio">Ninguém com esse email.</div>'; return; }
+    box.innerHTML = '<div class="esc"><table><tr><th>Email</th><th>VIP</th><th>Entrou</th><th>Última vez</th><th></th></tr>'
+      + us.map(function (u) {
+          const vip = u.vip_ate && new Date(u.vip_ate) > new Date();
+          return '<tr><td>' + esc(u.email) + '</td>'
+            + '<td>' + (vip ? '<span class="tag ok">até ' + dia(u.vip_ate) + '</span>' : '<span class="tag no">não</span>') + '</td>'
+            + '<td>' + dia(u.criado_em) + '</td><td>' + data(u.visto_em) + '</td>'
+            + '<td style="white-space:nowrap">'
+            + '<button class="mini" onclick="vip(\'' + u.id + '\',30)">+30d</button> '
+            + '<button class="mini sec" onclick="vip(\'' + u.id + '\',365)">+1a</button> '
+            + (vip ? '<button class="mini sec" onclick="semVip(\'' + u.id + '\')">tirar</button>' : '')
+            + '</td></tr>';
+        }).join('') + '</table></div>';
+  } catch (e) {
+    box.innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>';
+  }
+}
+
+async function vip(id, dias) {
+  try { const r = await chamar('dar_vip', { user_id: id, dias: dias });
+    alert('VIP até ' + dia(r.vip_ate)); buscar(); } catch (e) { alert(e.message); }
+}
+async function semVip(id) {
+  if (!confirm('Tirar o VIP desta conta?')) return;
+  try { await chamar('tirar_vip', { user_id: id }); buscar(); } catch (e) { alert(e.message); }
+}
+
+async function moderacao(c) {
+  const r = await chamar('moderacao');
+  const ds = r.denuncias || [];
+  c.innerHTML = '<div class="card"><h2>Comentários denunciados</h2>'
+    + (ds.length
+      ? '<div class="esc"><table><tr><th>Quando</th><th>Motivo</th><th>Autor</th><th>Comentário</th><th></th></tr>'
+        + ds.map(function (d) {
+            const cm = d.comentario || {};
+            return '<tr><td>' + dia(d.criado_em) + '</td><td>' + esc(d.motivo || '—') + '</td>'
+              + '<td>' + esc(cm.nome || '—') + '</td>'
+              + '<td style="max-width:340px">' + esc((cm.texto || '').slice(0, 160))
+              + (cm.removido ? ' <span class="tag no">removido</span>' : '') + '</td>'
+              + '<td style="white-space:nowrap">' + (cm.id
+                ? (cm.removido
+                    ? '<button class="mini sec" onclick="mod(\'' + cm.id + '\',true)">restaurar</button>'
+                    : '<button class="mini" onclick="mod(\'' + cm.id + '\',false)">remover</button>')
+                : '') + '</td></tr>';
+          }).join('') + '</table></div>'
+      : '<div class="vazio">Nenhuma denúncia. Boa notícia.</div>')
+    + '</div>';
+}
+async function mod(id, desfazer) {
+  try { await chamar('remover_comentario', { comentario_id: id, desfazer: desfazer }); abrir('moderacao'); }
+  catch (e) { alert(e.message); }
+}
+
+async function saude(c) {
+  const r = await chamar('saude');
+  const k = r.chaves || {}, a = r.anuncios || {};
+  function chave(nome, on, dica) {
+    return '<tr><td>' + nome + '</td><td><span class="tag ' + (on ? 'ok' : 'no') + '">'
+      + (on ? 'ligado' : 'desligado') + '</span></td><td style="color:var(--fraco);font-size:12px">' + dica + '</td></tr>';
+  }
+  c.innerHTML = '<div class="grade">'
+      + kpi(num(a.tickets), 'Tickets de anúncio')
+      + kpi(num(a.rewarded), 'Assistiram de verdade')
+      + kpi(num(a.fallback), 'Liberados sem anúncio')
+      + kpi(num(a.verificados), 'Verificados pelo SSV', a.verificados ? '' : 'SSV ainda não implantado')
+    + '</div>'
+    + '<div class="card"><h2>Chaves do servidor</h2><div class="esc"><table>'
+      + '<tr><th>Chave</th><th>Estado</th><th>O que faz</th></tr>'
+      + chave('anuncios_ligados', k.anuncios_ligados, 'Desligar tira o anúncio de todo mundo')
+      + chave('exigir_passe_anuncio', k.exigir_passe_anuncio, 'Sem ticket, o link não sai')
+      + chave('exigir_ssv_anuncio', k.exigir_ssv_anuncio, 'Só vale ticket confirmado pela rede de anúncio')
+      + chave('obrigatoria', k.obrigatoria, 'Versão ' + esc(k.versao || '?') + ' é o mínimo')
+      + chave('exigir_versao', k.exigir_versao, 'Recusa quem não manda a versão no cabeçalho')
+      + chave('apk_direto', k.apk_direto, 'Atualização por download do APK')
+    + '</table></div></div>'
+    + '<div class="card"><h2>Importadores</h2><div class="esc"><table>'
+      + '<tr><th>Fonte</th><th>Tipo</th><th>Página</th><th>Ciclo</th><th>Último resultado</th><th>Quando</th></tr>'
+      + (r.importadores || []).map(function (i) {
+          return '<tr><td>' + esc(i.fonte) + '</td><td>' + esc(i.tipo) + '</td>'
+            + '<td>' + num(i.pagina) + '/' + num(i.total_paginas) + '</td><td>' + num(i.ciclo) + '</td>'
+            + '<td style="color:var(--fraco);font-size:12px">' + esc((i.ultimo_resultado || '').slice(0, 60)) + '</td>'
+            + '<td>' + data(i.atualizado_em) + '</td></tr>';
+        }).join('')
+    + '</table></div></div>';
+}
+
+if (SENHA) { document.getElementById('senha').value = SENHA; entrar(); }
+</script>
+</body></html>
