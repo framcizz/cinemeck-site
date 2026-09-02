@@ -10,47 +10,64 @@ h1{font-size:22px;margin-bottom:4px}
 .sub{color:var(--fraco);font-size:13px;margin-bottom:20px}
 .login{max-width:340px;margin:14vh auto;text-align:center}
 input,select,textarea,button{font:inherit;border-radius:9px;border:1px solid var(--linha);background:#1b1b26;color:var(--txt);padding:10px 12px;outline:none}
-input:focus,select:focus{border-color:var(--vermelho)}
+textarea{width:100%;resize:vertical;min-height:66px}
+input:focus,select:focus,textarea:focus{border-color:var(--vermelho)}
 button{cursor:pointer;border-color:transparent;background:var(--vermelho);color:#fff;font-weight:700}
 button:hover{filter:brightness(1.1)}
+button:disabled{opacity:.5;cursor:default}
 button.sec{background:#22222e;color:var(--txt);font-weight:600}
 button.mini{padding:6px 10px;font-size:12px}
+button.perigo{background:#2a1216;color:#ff8b91;border:1px solid #52212a}
+button.perigo:hover{background:var(--vermelho);color:#fff}
 .abas{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1px solid var(--linha);padding-bottom:10px}
 .abas button{background:transparent;color:var(--fraco);font-weight:600;padding:8px 13px}
 .abas button.on{background:var(--vermelho);color:#fff}
 .grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:12px;margin-bottom:22px}
 .kpi{background:var(--card);border:1px solid var(--linha);border-radius:13px;padding:15px}
-.kpi .n{font-size:26px;font-weight:800;line-height:1.2}
+.kpi .n{font-size:26px;font-weight:800;line-height:1.2;font-variant-numeric:tabular-nums}
 .kpi .r{color:var(--fraco);font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
 .kpi .e{color:var(--fraco);font-size:11px;margin-top:6px}
 .card{background:var(--card);border:1px solid var(--linha);border-radius:13px;padding:16px;margin-bottom:16px}
 .card h2{font-size:15px;margin-bottom:12px}
+.card h3{font-size:13px;color:var(--fraco);text-transform:uppercase;letter-spacing:.5px;margin-bottom:9px}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{text-align:left;color:var(--fraco);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:8px 10px;border-bottom:1px solid var(--linha)}
+th{text-align:left;color:var(--fraco);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;padding:8px 10px;border-bottom:1px solid var(--linha);white-space:nowrap}
 td{padding:9px 10px;border-bottom:1px solid #1c1c26}
 tr:last-child td{border-bottom:none}
+tr.clicavel{cursor:pointer}
+tr.clicavel:hover td{background:#1b1b26}
+.num{font-variant-numeric:tabular-nums;text-align:right}
 .linha{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
-.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
 .tag.ok{background:rgba(34,197,94,.15);color:var(--verde)}
 .tag.no{background:rgba(229,9,20,.15);color:var(--vermelho)}
 .tag.q{background:rgba(255,197,49,.15);color:var(--amarelo)}
+.tag.n{background:#22222e;color:var(--fraco)}
 .aviso{padding:11px 13px;border-radius:9px;font-size:13px;margin-bottom:12px}
 .aviso.erro{background:rgba(229,9,20,.12);color:#ff8b91}
 .aviso.bom{background:rgba(34,197,94,.12);color:#7ee2a8}
 .vazio{color:var(--fraco);text-align:center;padding:26px;font-size:13px}
 .esc{overflow-x:auto}
 .oculto{display:none}
+.barra{height:7px;border-radius:5px;background:var(--vermelho);min-width:2px}
+/* gaveta da ficha */
+.sobre{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;justify-content:flex-end;z-index:50}
+.gaveta{background:var(--bg);width:min(780px,100%);height:100%;overflow-y:auto;padding:20px;border-left:1px solid var(--linha)}
+.gaveta .topo{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px}
+.gaveta .email{font-size:18px;font-weight:800;word-break:break-all}
+.duas{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.perigoso{border:1px solid #52212a;background:#170f12}
 </style></head><body>
 
 <div id="login" class="login">
-  <h1>CineMeck</h1><p class="sub">Painel do dono &middot; acompanhamento</p>
+  <h1>CineMeck</h1><p class="sub">Painel do dono</p>
   <div class="linha" style="flex-direction:column">
     <input id="senha" type="password" placeholder="Senha do painel" style="width:100%" autofocus>
     <button onclick="entrar()" style="width:100%">Entrar</button>
   </div>
   <div id="loginErro"></div>
   <p class="sub" style="margin-top:22px;font-size:12px">
-    Códigos VIP, cupons, pedidos e notificações ficam no
+    Códigos VIP, cupons, pedidos e notificações em massa ficam no
     <a href="admin.html" style="color:var(--vermelho)">painel de administração</a>.
   </p>
 </div>
@@ -61,11 +78,13 @@ tr:last-child td{border-bottom:none}
   <div id="conteudo"></div>
 </div>
 
+<div id="ficha" class="sobre oculto"><div class="gaveta" id="fichaCorpo"></div></div>
+
 <script>
-// Endereco absoluto: esta pagina nao e mais servida pela funcao (o
-// Supabase forca text/plain e CSP sandbox em Edge Function, entao HTML
-// nunca renderiza la). Abrindo de qualquer origem funciona porque a
-// funcao responde com Access-Control-Allow-Origin: *.
+// Endereco absoluto: esta pagina nao e servida pela funcao (o Supabase
+// forca text/plain e CSP sandbox em Edge Function, entao HTML nunca
+// renderiza la). Abrir de qualquer origem funciona porque a funcao
+// responde com Access-Control-Allow-Origin: *.
 const API = 'https://hulydzwtxomswogbdnap.supabase.co/functions/v1/painel-admin';
 let SENHA = sessionStorage.getItem('cm_senha') || '';
 
@@ -89,54 +108,56 @@ function num(v) { return (Number(v) || 0).toLocaleString('pt-BR'); }
 function dinheiro(v) { return 'R$ ' + (Number(v) || 0).toFixed(2).replace('.', ','); }
 function data(v) { return v ? new Date(v).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—'; }
 function dia(v) { return v ? new Date(v).toLocaleDateString('pt-BR') : '—'; }
+function vale(v) { return !!v && new Date(v) > new Date(); }
+function $(id) { return document.getElementById(id); }
 
 async function entrar() {
-  SENHA = document.getElementById('senha').value.trim();
-  const box = document.getElementById('loginErro');
+  SENHA = $('senha').value.trim();
+  const box = $('loginErro');
   box.innerHTML = '';
   try {
     await chamar('metricas');
     sessionStorage.setItem('cm_senha', SENHA);
-    document.getElementById('login').classList.add('oculto');
-    document.getElementById('app').classList.remove('oculto');
-    document.getElementById('agora').textContent = new Date().toLocaleString('pt-BR');
+    $('login').classList.add('oculto');
+    $('app').classList.remove('oculto');
+    $('agora').textContent = new Date().toLocaleString('pt-BR');
     montarAbas();
     abrir('visao');
   } catch (e) {
     box.innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>';
   }
 }
-document.getElementById('senha').addEventListener('keydown', function (e) { if (e.key === 'Enter') entrar(); });
+$('senha').addEventListener('keydown', function (e) { if (e.key === 'Enter') entrar(); });
 
 const ABAS = [
   ['visao', 'Visão geral'],
+  ['pessoas', 'Usuários'],
+  ['dinheiro', 'Dinheiro'],
   ['conteudo', 'Mais assistidos'],
   ['notas', 'Avaliações'],
-  ['pessoas', 'Usuários e VIP'],
   ['moderacao', 'Moderação'],
   ['saude', 'Saúde'],
 ];
-let abaAtual = 'visao';
 
 function montarAbas() {
-  document.getElementById('abas').innerHTML = ABAS.map(function (a) {
+  $('abas').innerHTML = ABAS.map(function (a) {
     return '<button id="aba-' + a[0] + '" onclick="abrir(\'' + a[0] + '\')">' + a[1] + '</button>';
   }).join('');
 }
 
 async function abrir(nome) {
-  abaAtual = nome;
   ABAS.forEach(function (a) {
-    const b = document.getElementById('aba-' + a[0]);
+    const b = $('aba-' + a[0]);
     if (b) b.className = a[0] === nome ? 'on' : '';
   });
-  const c = document.getElementById('conteudo');
+  const c = $('conteudo');
   c.innerHTML = '<div class="vazio">Carregando…</div>';
   try {
     if (nome === 'visao') return await visao(c);
+    if (nome === 'pessoas') return pessoas(c);
+    if (nome === 'dinheiro') return await dinheiro_(c);
     if (nome === 'conteudo') return await topConteudo(c);
     if (nome === 'notas') return await topNotas(c);
-    if (nome === 'pessoas') return pessoas(c);
     if (nome === 'moderacao') return await moderacao(c);
     if (nome === 'saude') return await saude(c);
   } catch (e) {
@@ -149,6 +170,7 @@ function kpi(n, r, extra) {
     + (extra ? '<div class="e">' + extra + '</div>' : '') + '</div>';
 }
 
+// ===================== visao geral =====================
 async function visao(c) {
   const m = (await chamar('metricas')).metricas;
   const u = m.usuarios || {}, v = m.vip || {}, d = m.dinheiro || {}, cat = m.catalogo || {}, e = m.engajamento || {};
@@ -169,7 +191,7 @@ async function visao(c) {
   h += '<div class="card"><h2>Versões instaladas</h2><div class="esc"><table>'
     + '<tr><th>Versão</th><th>Ativos (7 dias)</th><th>Total</th></tr>'
     + (m.versoes || []).map(function (x) {
-        return '<tr><td>' + esc(x.versao) + '</td><td><b>' + num(x.ativos_7d) + '</b></td><td>' + num(x.total) + '</td></tr>';
+        return '<tr><td>' + esc(x.versao) + '</td><td class="num"><b>' + num(x.ativos_7d) + '</b></td><td class="num">' + num(x.total) + '</td></tr>';
       }).join('')
     + '</table></div>'
     + '<div class="e" style="color:var(--fraco);font-size:12px;margin-top:10px">'
@@ -178,10 +200,364 @@ async function visao(c) {
   c.innerHTML = h;
 }
 
+// ===================== usuarios =====================
+const ORDENS = [
+  ['recentes', 'Mais recentes'],
+  ['antigos', 'Ordem de chegada'],
+  ['ativos', 'Assistiram por último'],
+  ['vip', 'VIP mais longo'],
+  ['gastou', 'Quem mais gastou'],
+];
+let uPagina = 1, uBusca = '', uOrdem = 'recentes', uTotal = 0;
+
+function pessoas(c) {
+  c.innerHTML = '<div class="card">'
+    + '<div class="linha">'
+      + '<input id="busca" placeholder="Procurar e-mail…" style="flex:1;min-width:200px" value="' + esc(uBusca) + '">'
+      + '<select id="ordem">' + ORDENS.map(function (o) {
+          return '<option value="' + o[0] + '"' + (o[0] === uOrdem ? ' selected' : '') + '>' + o[1] + '</option>';
+        }).join('') + '</select>'
+      + '<button onclick="verUsuarios(1)">Buscar</button>'
+    + '</div>'
+    + '<div id="listaU"><div class="vazio">Carregando…</div></div>'
+  + '</div>';
+  $('busca').addEventListener('keydown', function (e) { if (e.key === 'Enter') verUsuarios(1); });
+  $('ordem').addEventListener('change', function () { verUsuarios(1); });
+  verUsuarios(uPagina);
+}
+
+async function verUsuarios(pagina) {
+  const box = $('listaU');
+  if (!box) return;
+  uBusca = ($('busca') || {}).value ? $('busca').value.trim() : '';
+  uOrdem = ($('ordem') || {}).value || 'recentes';
+  uPagina = Math.max(1, pagina || 1);
+  box.innerHTML = '<div class="vazio">Carregando…</div>';
+  try {
+    const r = await chamar('listar_usuarios', {
+      busca: uBusca, ordem: uOrdem, pagina: uPagina, por_pagina: 50,
+    });
+    uTotal = r.total || 0;
+    const us = r.usuarios || [];
+    const paginas = Math.max(1, Math.ceil(uTotal / (r.por_pagina || 50)));
+    if (!us.length) { box.innerHTML = '<div class="vazio">Nenhuma conta com esse e-mail.</div>'; return; }
+    box.innerHTML = '<div class="linha" style="justify-content:space-between">'
+        + '<span class="sub" style="margin:0">' + num(uTotal) + ' contas · página ' + uPagina + ' de ' + paginas + '</span>'
+        + '<span>'
+          + '<button class="mini sec" onclick="verUsuarios(' + (uPagina - 1) + ')"' + (uPagina <= 1 ? ' disabled' : '') + '>‹ anterior</button> '
+          + '<button class="mini sec" onclick="verUsuarios(' + (uPagina + 1) + ')"' + (uPagina >= paginas ? ' disabled' : '') + '>próxima ›</button>'
+        + '</span>'
+      + '</div>'
+      + '<div class="esc"><table>'
+      + '<tr><th>E-mail</th><th>Entrou</th><th>Assistiu por último</th><th>VIP</th><th>Pagou</th><th>Versão</th></tr>'
+      + us.map(function (u) {
+          const vip = vale(u.vip_ate);
+          return '<tr class="clicavel" onclick="verFicha(\'' + u.id + '\')">'
+            + '<td>' + esc(u.email) + '</td>'
+            + '<td>' + dia(u.criado_em) + '</td>'
+            + '<td>' + (u.visto_em ? data(u.visto_em) : '<span style="color:var(--fraco)">nunca</span>') + '</td>'
+            + '<td>' + (vip ? '<span class="tag ok">até ' + dia(u.vip_ate) + '</span>' : '<span class="tag n">não</span>') + '</td>'
+            + '<td class="num">' + (Number(u.pago) > 0 ? dinheiro(u.pago) : '—') + '</td>'
+            + '<td>' + (u.versao ? esc(u.versao) : '<span style="color:var(--fraco)">—</span>') + '</td>'
+            + '</tr>';
+        }).join('')
+      + '</table></div>';
+  } catch (e) {
+    box.innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>';
+  }
+}
+
+// ===================== ficha do usuario =====================
+let fichaId = '', fichaEmail = '';
+
+function fecharFicha() {
+  $('ficha').classList.add('oculto');
+  $('fichaCorpo').innerHTML = '';
+  fichaId = ''; fichaEmail = '';
+}
+$('ficha').addEventListener('click', function (e) { if (e.target === $('ficha')) fecharFicha(); });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && fichaId) fecharFicha(); });
+
+async function verFicha(id) {
+  fichaId = id;
+  $('ficha').classList.remove('oculto');
+  $('fichaCorpo').innerHTML = '<div class="vazio">Carregando…</div>';
+  try {
+    const f = (await chamar('ficha_usuario', { user_id: id })).ficha;
+    fichaEmail = f.conta.email || '';
+    pintarFicha(f);
+  } catch (e) {
+    $('fichaCorpo').innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>'
+      + '<button class="sec" onclick="fecharFicha()">Fechar</button>';
+  }
+}
+
+function listinha(titulo, itens, linha, vazio) {
+  return '<div class="card"><h3>' + titulo + '</h3>'
+    + (itens.length
+        ? '<div class="esc"><table>' + itens.map(linha).join('') + '</table></div>'
+        : '<div class="vazio" style="padding:14px">' + vazio + '</div>')
+    + '</div>';
+}
+
+function pintarFicha(f) {
+  const c = f.conta || {}, g = f.gasto || {}, vip = f.vip || {};
+  const temVip = vale(vip.vip_ate);
+  const integ = f.integridade;
+
+  let h = '<div class="topo">'
+      + '<div><div class="email">' + esc(c.email) + '</div>'
+        + '<div class="sub" style="margin:4px 0 0">' + (c.nome ? esc(c.nome) + ' · ' : '')
+        + 'entrou em ' + dia(c.criado_em) + ' · último login ' + data(c.ultimo_login) + '</div>'
+        + '<div style="margin-top:7px">'
+          + (temVip ? '<span class="tag ok">VIP até ' + dia(vip.vip_ate) + '</span> ' : '<span class="tag n">sem VIP</span> ')
+          + (c.email_confirmado ? '' : '<span class="tag q">e-mail não confirmado</span> ')
+          + (integ ? '<span class="tag ' + (integ.app_ok ? 'ok' : 'no') + '">app ' + (integ.app_ok ? 'original' : 'reprovado') + '</span>' : '')
+        + '</div>'
+      + '</div>'
+      + '<button class="sec mini" onclick="fecharFicha()">Fechar ✕</button>'
+    + '</div>';
+
+  h += '<div class="grade">'
+    + kpi(dinheiro(g.total), 'Já pagou', num(g.compras) + ' compra(s)')
+    + kpi(num(f.assistiu_total), 'Itens assistidos')
+    + kpi(num(f.favoritos_total), 'Favoritos')
+    + kpi(num(f.avaliacoes), 'Avaliações')
+    + kpi(num((f.comentarios || []).length), 'Comentários')
+    + kpi(num((f.aparelhos || []).length), 'Aparelhos')
+    + '</div>';
+
+  h += '<div id="fichaAviso"></div>';
+
+  // ---- acoes ----
+  h += '<div class="duas">'
+    + '<div class="card"><h3>VIP</h3><div class="linha">'
+      + [7, 30, 90, 365].map(function (d) {
+          return '<button class="mini" onclick="daVip(' + d + ')">+' + d + 'd</button>';
+        }).join(' ')
+      + '<input id="vipDias" type="number" min="1" max="3650" placeholder="dias" style="width:88px">'
+      + '<button class="mini sec" onclick="daVip(0)">Dar</button>'
+      + (temVip ? ' <button class="mini sec" onclick="tiraVip()">Tirar VIP</button>' : '')
+      + '</div>'
+      + '<div class="sub" style="margin:0;font-size:12px">Somar dias não apaga o que já resta.</div>'
+    + '</div>'
+    + '<div class="card"><h3>Senha</h3>'
+      + '<button class="sec mini" onclick="linkSenha()">Gerar link de trocar senha</button>'
+      + '<div id="boxLink" style="margin-top:9px"></div>'
+      + '<div class="sub" style="margin:6px 0 0;font-size:12px">O link vai para a mesma tela do “esqueci minha senha”. Você copia e manda para a pessoa.</div>'
+    + '</div>'
+  + '</div>';
+
+  h += '<div class="card"><h3>Mandar recado só para essa pessoa</h3>'
+    + '<div class="linha"><input id="notifTitulo" placeholder="Título" value="CineMeck" style="flex:1;min-width:160px"></div>'
+    + '<textarea id="notifMsg" placeholder="Mensagem…" maxlength="500"></textarea>'
+    + '<div class="linha" style="margin:10px 0 0"><button class="mini" onclick="notificar()">Enviar notificação</button></div>'
+  + '</div>';
+
+  // ---- listas ----
+  h += listinha('Pagamentos', f.pagamentos || [], function (p) {
+    return '<tr><td>' + dia(p.criado_em) + '</td><td class="num">' + dinheiro(p.valor) + '</td>'
+      + '<td>' + num(p.plano_dias) + ' dias</td>'
+      + '<td><span class="tag ' + (p.status === 'pago' ? 'ok' : p.status === 'pendente' ? 'q' : 'n') + '">' + esc(p.status) + '</span></td>'
+      + '<td>' + (p.cupom ? esc(p.cupom) : '') + '</td></tr>';
+  }, 'Nunca comprou nada.');
+
+  h += listinha('O que assistiu (últimos 20)', f.historico || [], function (x) {
+    const pct = Math.round(Number(x.progress || 0)); // historico.progress ja vem em %
+    return '<tr><td>' + esc(x.title || x.item_id) + '</td>'
+      + '<td>' + (x.temporada ? 'T' + esc(x.temporada) + (x.episodio_num ? ' E' + x.episodio_num : '') : (x.tipo === 'series' ? 'série' : 'filme')) + '</td>'
+      + '<td class="num">' + (x.completo ? '<span class="tag ok">viu tudo</span>' : pct + '%') + '</td>'
+      + '<td>' + data(x.visto_em) + '</td></tr>';
+  }, 'Ainda não assistiu nada.');
+
+  h += '<div class="duas">';
+  h += listinha('Favoritos', f.favoritos || [], function (x) {
+    return '<tr><td>' + esc(x.title || x.item_id) + '</td><td>' + dia(x.criado_em) + '</td></tr>';
+  }, 'Sem favoritos.');
+  h += listinha('Perfis', f.perfis || [], function (p) {
+    return '<tr><td>' + esc(p.nome) + '</td><td>' + (p.infantil ? '<span class="tag q">infantil</span>' : '') + '</td></tr>';
+  }, 'Não criou perfil.');
+  h += '</div>';
+
+  h += listinha('Comentários', f.comentarios || [], function (x) {
+    return '<tr><td style="max-width:420px">' + esc((x.texto || '').slice(0, 200))
+      + (x.removido ? ' <span class="tag no">removido</span>' : '') + '</td>'
+      + '<td>' + dia(x.criado_em) + '</td>'
+      + '<td>' + (x.removido
+          ? '<button class="mini sec" onclick="comentario(\'' + x.id + '\',true)">restaurar</button>'
+          : '<button class="mini sec" onclick="comentario(\'' + x.id + '\',false)">remover</button>') + '</td></tr>';
+  }, 'Nunca comentou.');
+
+  h += '<div class="duas">';
+  h += listinha('Aparelhos', f.aparelhos || [], function (a) {
+    return '<tr><td>' + esc(a.plataforma || '—') + '</td><td>' + (a.app_versao ? esc(a.app_versao) : '<span style="color:var(--fraco)">sem versão</span>') + '</td>'
+      + '<td>' + dia(a.atualizado_em) + '</td></tr>';
+  }, 'Nenhum aparelho registrado para push.');
+  h += listinha('Pedidos', f.pedidos || [], function (p) {
+    return '<tr><td>' + esc(p.titulo) + '</td><td>' + esc(p.status) + '</td><td>' + dia(p.criado_em) + '</td></tr>';
+  }, 'Nunca pediu nada.');
+  h += '</div>';
+
+  // ---- excluir ----
+  h += '<div class="card perigoso"><h3 style="color:#ff8b91">Excluir conta</h3>'
+    + '<p class="sub" style="margin:0 0 10px">Apaga o login, histórico, favoritos, perfis, avaliações, comentários, VIP e os aparelhos. '
+    + 'Pagamentos e pedidos ficam no caixa, mas sem dono. <b>Não tem desfazer.</b></p>'
+    + '<div id="boxExcluir"><button class="perigo mini" onclick="pedirExclusao()">Quero excluir esta conta</button></div>'
+  + '</div>';
+
+  $('fichaCorpo').innerHTML = h;
+  $('fichaCorpo').scrollTop = 0;
+}
+
+function avisoFicha(texto, bom) {
+  const b = $('fichaAviso');
+  if (b) b.innerHTML = '<div class="aviso ' + (bom ? 'bom' : 'erro') + '">' + esc(texto) + '</div>';
+}
+
+async function recarregarFicha() {
+  const id = fichaId;
+  const f = (await chamar('ficha_usuario', { user_id: id })).ficha;
+  pintarFicha(f);
+}
+
+async function daVip(dias) {
+  const d = dias || Number(($('vipDias') || {}).value || 0);
+  if (!d || d < 1) { avisoFicha('Diga quantos dias.'); return; }
+  try {
+    const r = await chamar('dar_vip', { user_id: fichaId, dias: d });
+    await recarregarFicha();
+    avisoFicha('VIP até ' + dia(r.vip_ate) + '.', true);
+  } catch (e) { avisoFicha(e.message); }
+}
+
+async function tiraVip() {
+  if (!confirm('Tirar o VIP desta conta?')) return;
+  try {
+    await chamar('tirar_vip', { user_id: fichaId });
+    await recarregarFicha();
+    avisoFicha('VIP removido.', true);
+  } catch (e) { avisoFicha(e.message); }
+}
+
+async function notificar() {
+  const titulo = ($('notifTitulo') || {}).value || 'CineMeck';
+  const mensagem = (($('notifMsg') || {}).value || '').trim();
+  if (!mensagem) { avisoFicha('Escreva a mensagem.'); return; }
+  try {
+    const r = await chamar('notificar_usuario', { user_id: fichaId, titulo, mensagem });
+    $('notifMsg').value = '';
+    avisoFicha(r.aviso || ('Enviado para ' + num(r.enviados) + ' aparelho(s).'), !r.aviso);
+  } catch (e) { avisoFicha(e.message); }
+}
+
+async function linkSenha() {
+  const box = $('boxLink');
+  box.innerHTML = '<span class="sub">Gerando…</span>';
+  try {
+    const r = await chamar('link_senha', { email: fichaEmail });
+    box.innerHTML = '<input readonly value="' + esc(r.link) + '" style="width:100%;font-size:12px" onclick="this.select()">'
+      + '<div class="sub" style="margin:5px 0 0;font-size:12px">Clique para selecionar e copiar. O link vence em 1 hora.</div>';
+  } catch (e) {
+    box.innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>';
+  }
+}
+
+async function comentario(id, desfazer) {
+  try {
+    await chamar('remover_comentario', { comentario_id: id, desfazer: desfazer });
+    await recarregarFicha();
+  } catch (e) { avisoFicha(e.message); }
+}
+
+// Duas etapas de proposito: numa lista de centenas de linhas, um clique
+// errado apagaria a pessoa errada, e nao existe desfazer.
+function pedirExclusao() {
+  $('boxExcluir').innerHTML = '<p class="sub" style="margin:0 0 8px">Digite <b>' + esc(fichaEmail) + '</b> para confirmar:</p>'
+    + '<div class="linha"><input id="confEmail" placeholder="e-mail da conta" style="flex:1;min-width:220px" autocomplete="off">'
+    + '<button class="perigo mini" onclick="excluirConta()">Excluir para sempre</button>'
+    + '<button class="sec mini" onclick="pintarFichaCancelar()">Cancelar</button></div>';
+  $('confEmail').focus();
+}
+function pintarFichaCancelar() {
+  $('boxExcluir').innerHTML = '<button class="perigo mini" onclick="pedirExclusao()">Quero excluir esta conta</button>';
+}
+
+async function excluirConta() {
+  const digitado = (($('confEmail') || {}).value || '').trim();
+  if (digitado.toLowerCase() !== String(fichaEmail).toLowerCase()) {
+    avisoFicha('O e-mail digitado não confere.');
+    return;
+  }
+  try {
+    await chamar('excluir_conta', { user_id: fichaId, confirmar_email: digitado });
+    fecharFicha();
+    verUsuarios(uPagina);
+  } catch (e) { avisoFicha(e.message); }
+}
+
+// ===================== dinheiro =====================
+let pStatus = '';
+async function dinheiro_(c) {
+  const [m, meses] = await Promise.all([chamar('metricas'), chamar('receita_mensal', { meses: 12 })]);
+  const d = (m.metricas || {}).dinheiro || {};
+  const linhas = meses.meses || [];
+  const teto = Math.max.apply(null, linhas.map(function (x) { return Number(x.receita) || 0; }).concat([1]));
+
+  c.innerHTML = '<div class="grade">'
+      + kpi(dinheiro(d.pago_total), 'Recebido no total')
+      + kpi(dinheiro(d.pago_30d), 'Últimos 30 dias')
+      + kpi(num(d.pendentes), 'Pix pendentes')
+    + '</div>'
+    + '<div class="card"><h2>Receita por mês</h2>'
+      + (linhas.length
+        ? '<div class="esc"><table><tr><th>Mês</th><th>Vendas</th><th>Receita</th><th style="width:45%"></th></tr>'
+          + linhas.map(function (x) {
+              const largura = Math.round((Number(x.receita) / teto) * 100);
+              return '<tr><td>' + esc(String(x.mes).slice(0, 7).split('-').reverse().join('/')) + '</td>'
+                + '<td class="num">' + num(x.vendas) + '</td>'
+                + '<td class="num">' + dinheiro(x.receita) + '</td>'
+                + '<td><div class="barra" style="width:' + largura + '%"></div></td></tr>';
+            }).join('') + '</table></div>'
+        : '<div class="vazio">Nenhuma venda ainda.</div>')
+    + '</div>'
+    + '<div class="card"><h2>Pagamentos</h2><div class="linha">'
+      + [['', 'Todos'], ['pago', 'Pagos'], ['pendente', 'Pendentes']].map(function (s) {
+          return '<button class="mini ' + (s[0] === pStatus ? '' : 'sec') + '" onclick="verPagamentos(\'' + s[0] + '\')">' + s[1] + '</button>';
+        }).join(' ')
+      + '</div><div id="listaP"><div class="vazio">Carregando…</div></div></div>';
+  verPagamentos(pStatus);
+}
+
+async function verPagamentos(status) {
+  pStatus = status || '';
+  const box = $('listaP');
+  if (!box) return;
+  try {
+    const r = await chamar('listar_pagamentos', { status: pStatus, limite: 200 });
+    const ps = r.pagamentos || [];
+    if (!ps.length) { box.innerHTML = '<div class="vazio">Nada aqui.</div>'; return; }
+    box.innerHTML = '<div class="esc"><table>'
+      + '<tr><th>E-mail</th><th>Valor</th><th>Plano</th><th>Status</th><th>Cupom</th><th>Criado</th><th>Pago</th></tr>'
+      + ps.map(function (p) {
+          return '<tr' + (p.user_id ? ' class="clicavel" onclick="verFicha(\'' + p.user_id + '\')"' : '') + '>'
+            + '<td>' + (p.email ? esc(p.email) : '<span style="color:var(--fraco)">conta excluída</span>') + '</td>'
+            + '<td class="num">' + dinheiro(p.valor) + '</td>'
+            + '<td>' + num(p.plano_dias) + ' dias</td>'
+            + '<td><span class="tag ' + (p.status === 'pago' ? 'ok' : p.status === 'pendente' ? 'q' : 'n') + '">' + esc(p.status) + '</span></td>'
+            + '<td>' + (p.cupom ? esc(p.cupom) : '—') + '</td>'
+            + '<td>' + dia(p.criado_em) + '</td><td>' + dia(p.pago_em) + '</td></tr>';
+        }).join('')
+      + '</table></div>';
+  } catch (e) {
+    box.innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>';
+  }
+}
+
+// ===================== mais assistidos =====================
 async function topConteudo(c) {
   const dias = Number(sessionStorage.getItem('cm_dias') || 30);
   const r = await chamar('top_conteudo', { dias: dias, limite: 30 });
-  let h = '<div class="card"><h2>Mais assistidos</h2><div class="linha">'
+  c.innerHTML = '<div class="card"><h2>Mais assistidos</h2><div class="linha">'
     + [7, 30, 90].map(function (d) {
         return '<button class="mini ' + (d === dias ? '' : 'sec') + '" onclick="verDias(' + d + ')">' + d + ' dias</button>';
       }).join('')
@@ -189,15 +565,15 @@ async function topConteudo(c) {
     + (r.itens || []).map(function (x, i) {
         return '<tr><td>' + (i + 1) + '</td><td>' + esc(x.title || x.item_id) + '</td>'
           + '<td>' + (x.tipo === 'series' ? 'Série' : 'Filme') + '</td>'
-          + '<td><b>' + num(x.pessoas) + '</b></td><td>' + num(x.media_pct) + '%</td></tr>';
+          + '<td class="num"><b>' + num(x.pessoas) + '</b></td><td class="num">' + num(x.media_pct) + '%</td></tr>';
       }).join('')
     + '</table></div>'
     + ((r.itens || []).length ? '' : '<div class="vazio">Ninguém assistiu nada nesse período.</div>')
     + '</div>';
-  c.innerHTML = h;
 }
 function verDias(d) { sessionStorage.setItem('cm_dias', d); abrir('conteudo'); }
 
+// ===================== avaliacoes =====================
 async function topNotas(c) {
   const r = await chamar('top_avaliados', { min_votos: 1, limite: 40 });
   const itens = r.itens || [];
@@ -207,55 +583,14 @@ async function topNotas(c) {
         + itens.map(function (x, i) {
             return '<tr><td>' + (i + 1) + '</td><td>' + (x.media_type === 'tv' ? 'Série' : 'Filme') + '</td>'
               + '<td>' + esc(x.item_id) + '</td>'
-              + '<td><b style="color:var(--amarelo)">' + Number(x.media).toFixed(1).replace('.', ',') + '</b></td>'
-              + '<td>' + num(x.votos) + '</td></tr>';
+              + '<td class="num"><b style="color:var(--amarelo)">' + Number(x.media).toFixed(1).replace('.', ',') + '</b></td>'
+              + '<td class="num">' + num(x.votos) + '</td></tr>';
           }).join('') + '</table></div>'
       : '<div class="vazio">Ainda não há avaliações. Elas aparecem aqui assim que a primeira pessoa votar no app.</div>')
     + '</div>';
 }
 
-function pessoas(c) {
-  c.innerHTML = '<div class="card"><h2>Buscar usuário</h2>'
-    + '<div class="linha"><input id="busca" placeholder="parte do email (3+ letras)" style="flex:1;min-width:220px">'
-    + '<button onclick="buscar()">Buscar</button></div><div id="res"></div></div>';
-  const i = document.getElementById('busca');
-  i.addEventListener('keydown', function (e) { if (e.key === 'Enter') buscar(); });
-  i.focus();
-}
-
-async function buscar() {
-  const box = document.getElementById('res');
-  box.innerHTML = '<div class="vazio">Procurando…</div>';
-  try {
-    const r = await chamar('buscar_usuario', { termo: document.getElementById('busca').value });
-    const us = r.usuarios || [];
-    if (!us.length) { box.innerHTML = '<div class="vazio">Ninguém com esse email.</div>'; return; }
-    box.innerHTML = '<div class="esc"><table><tr><th>Email</th><th>VIP</th><th>Entrou</th><th>Última vez</th><th></th></tr>'
-      + us.map(function (u) {
-          const vip = u.vip_ate && new Date(u.vip_ate) > new Date();
-          return '<tr><td>' + esc(u.email) + '</td>'
-            + '<td>' + (vip ? '<span class="tag ok">até ' + dia(u.vip_ate) + '</span>' : '<span class="tag no">não</span>') + '</td>'
-            + '<td>' + dia(u.criado_em) + '</td><td>' + data(u.visto_em) + '</td>'
-            + '<td style="white-space:nowrap">'
-            + '<button class="mini" onclick="vip(\'' + u.id + '\',30)">+30d</button> '
-            + '<button class="mini sec" onclick="vip(\'' + u.id + '\',365)">+1a</button> '
-            + (vip ? '<button class="mini sec" onclick="semVip(\'' + u.id + '\')">tirar</button>' : '')
-            + '</td></tr>';
-        }).join('') + '</table></div>';
-  } catch (e) {
-    box.innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>';
-  }
-}
-
-async function vip(id, dias) {
-  try { const r = await chamar('dar_vip', { user_id: id, dias: dias });
-    alert('VIP até ' + dia(r.vip_ate)); buscar(); } catch (e) { alert(e.message); }
-}
-async function semVip(id) {
-  if (!confirm('Tirar o VIP desta conta?')) return;
-  try { await chamar('tirar_vip', { user_id: id }); buscar(); } catch (e) { alert(e.message); }
-}
-
+// ===================== moderacao =====================
 async function moderacao(c) {
   const r = await chamar('moderacao');
   const ds = r.denuncias || [];
@@ -282,6 +617,7 @@ async function mod(id, desfazer) {
   catch (e) { alert(e.message); }
 }
 
+// ===================== saude =====================
 async function saude(c) {
   const r = await chamar('saude');
   const k = r.chaves || {}, a = r.anuncios || {};
@@ -303,18 +639,21 @@ async function saude(c) {
       + chave('obrigatoria', k.obrigatoria, 'Versão ' + esc(k.versao || '?') + ' é o mínimo')
       + chave('exigir_versao', k.exigir_versao, 'Recusa quem não manda a versão no cabeçalho')
       + chave('apk_direto', k.apk_direto, 'Atualização por download do APK')
-    + '</table></div></div>'
+    + '</table></div>'
+    + '<div class="sub" style="margin:10px 0 0;font-size:12px">Para mudar essas chaves, use a aba “Versão do app” no '
+    + '<a href="admin.html" style="color:var(--vermelho)">painel de administração</a>.</div></div>'
     + '<div class="card"><h2>Importadores</h2><div class="esc"><table>'
       + '<tr><th>Fonte</th><th>Tipo</th><th>Página</th><th>Ciclo</th><th>Último resultado</th><th>Quando</th></tr>'
       + (r.importadores || []).map(function (i) {
           return '<tr><td>' + esc(i.fonte) + '</td><td>' + esc(i.tipo) + '</td>'
-            + '<td>' + num(i.pagina) + '/' + num(i.total_paginas) + '</td><td>' + num(i.ciclo) + '</td>'
+            + '<td class="num">' + num(i.pagina) + '/' + num(i.total_paginas) + '</td><td class="num">' + num(i.ciclo) + '</td>'
             + '<td style="color:var(--fraco);font-size:12px">' + esc((i.ultimo_resultado || '').slice(0, 60)) + '</td>'
             + '<td>' + data(i.atualizado_em) + '</td></tr>';
         }).join('')
     + '</table></div></div>';
 }
 
-if (SENHA) { document.getElementById('senha').value = SENHA; entrar(); }
+if (SENHA) { $('senha').value = SENHA; entrar(); }
 </script>
+
 </body></html>
