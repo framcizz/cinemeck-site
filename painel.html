@@ -323,8 +323,8 @@ function pintarFicha(f) {
     + kpi(num(f.assistiu_total), 'Itens assistidos')
     + kpi(num(f.favoritos_total), 'Favoritos')
     + kpi(num(f.avaliacoes), 'Avaliações')
-    + kpi(num((f.comentarios || []).length), 'Comentários')
-    + kpi(num((f.aparelhos || []).length), 'Aparelhos')
+    + kpi(num(f.comentarios_total), 'Comentários')
+    + kpi(num(f.aparelhos_total), 'Aparelhos')
     + '</div>';
 
   h += '<div id="fichaAviso"></div>';
@@ -379,7 +379,7 @@ function pintarFicha(f) {
   }, 'Não criou perfil.');
   h += '</div>';
 
-  h += listinha('Comentários', f.comentarios || [], function (x) {
+  h += listinha('Comentários (últimos 20)', f.comentarios || [], function (x) {
     return '<tr><td style="max-width:420px">' + esc((x.texto || '').slice(0, 200))
       + (x.removido ? ' <span class="tag no">removido</span>' : '') + '</td>'
       + '<td>' + dia(x.criado_em) + '</td>'
