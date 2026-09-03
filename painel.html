@@ -59,6 +59,16 @@ tr.clicavel:hover td{background:#1b1b26}
 .gaveta .email{font-size:18px;font-weight:800;word-break:break-all}
 .duas{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
 .perigoso{border:1px solid #52212a;background:#170f12}
+.ajuda summary{cursor:pointer;color:var(--txt);font-weight:700;font-size:14px;list-style:none}
+.ajuda summary::-webkit-details-marker{display:none}
+.ajuda summary::before{content:'▸ ';color:var(--vermelho)}
+.ajuda[open] summary::before{content:'▾ '}
+.ajuda ol{margin:12px 0 0 18px;padding:0}
+.ajuda li{margin-bottom:9px;line-height:1.5;font-size:13px}
+.ajuda p{margin:12px 0 0;line-height:1.5;font-size:13px}
+.ajuda code{background:#0d0d14;border:1px solid var(--linha);border-radius:4px;padding:1px 5px;font-size:12px}
+.ajuda .grave{border-left:3px solid var(--vermelho);padding-left:11px;margin-top:14px}
+.ajuda .nota{border-left:3px solid var(--amarelo);padding-left:11px;margin-top:14px}
 .chk{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none}
 .chk input{width:16px;height:16px;padding:0;accent-color:var(--vermelho);cursor:pointer}
 .campo{display:block;margin-bottom:11px}
@@ -764,8 +774,69 @@ async function controle(c) {
       + '<button onclick="salvarVersao()">Salvar versão</button>'
       + (g.atualizado_em ? '<div class="sub" style="margin:10px 0 0">Última mudança: ' + data(g.atualizado_em) + '.</div>' : '')
       + '<div id="vAviso" style="margin-top:10px"></div>'
-    + '</div>';
+    + '</div>'
+
+    + AJUDA;
 }
+
+// ============================================================
+//  O passo a passo
+//
+//  Fica aqui embaixo, fechado, porque quem ja sabe usar nao precisa
+//  rolar por cima dele toda vez -- e quem esqueceu acha na hora, sem
+//  ter de procurar em outro lugar.
+// ============================================================
+const AJUDA =
+  '<div class="card">'
+    + '<details class="ajuda">'
+      + '<summary>Como ligar a manutenção</summary>'
+      + '<ol>'
+        + '<li>Escreva o <b>título</b> e o <b>recado</b>. Pode deixar em branco: '
+          + 'o app usa "Em manutenção" e um texto padrão.</li>'
+        + '<li>Escolha em <b>"Desliga sozinha em"</b>. Se você não tem certeza de '
+          + 'quanto tempo vai levar, ponha 1 hora: se resolver antes, é só desligar '
+          + 'na mão; se esquecer ligada, o app volta sozinho.</li>'
+        + '<li>Clique em <b>Ligar manutenção</b> e confirme.</li>'
+        + '<li>Para tirar: <b>Desligar agora</b>. O app de todo mundo volta em até '
+          + '45 segundos — ninguém precisa reinstalar nem limpar dados.</li>'
+      + '</ol>'
+      + '<p>Enquanto está ligada, ninguém entra em tela nenhuma: nem no player, '
+        + 'nem no catálogo. É a trava mais forte que existe no painel.</p>'
+      + '<div class="nota"><b>Só funciona da versão 1.1.5 em diante.</b> Quem estiver '
+        + 'na 1.1.2 ou 1.1.4 não vê a tela de manutenção, porque esse código não '
+        + 'existe naqueles APKs. Depois que o pessoal atualizar, alcança todo mundo.</div>'
+      + '<div class="nota">Celular sem internet abre o app normal. É de propósito: '
+        + 'assim uma queda de rede não tranca o app de ninguém — mas também quer dizer '
+        + 'que a manutenção não é uma trava absoluta.</div>'
+    + '</details>'
+  + '</div>'
+
+  + '<div class="card">'
+    + '<details class="ajuda">'
+      + '<summary>Como publicar uma versão nova</summary>'
+      + '<p>São três campos que trabalham juntos:</p>'
+      + '<ol>'
+        + '<li><b>Versão mais nova</b> — o app compara com a versão <i>dele</i>. '
+          + 'Se a dele for menor, mostra o aviso. Formato <code>1.1.6</code>, três números.</li>'
+        + '<li><b>Link do APK</b> — de onde o app vai baixar. Tem que ser o arquivo '
+          + 'direto: se você abrir o link no navegador e o APK baixar, está certo.</li>'
+        + '<li><b>Baixar o APK direto</b> — ligado, baixa e instala dentro do app; '
+          + 'desligado, só abre o link (use assim se quiser mandar para a Play).</li>'
+      + '</ol>'
+      + '<div class="grave"><b>Preencha versão e link JUNTOS, na mesma salvada.</b> '
+        + 'Se você mudar só a versão, todo mundo passa a ver o aviso apontando para o '
+        + 'link antigo. Com "baixar direto" ligado e um link que não é APK, o app tenta '
+        + 'baixar aquilo como se fosse arquivo — ele confere os bytes e recusa, então '
+        + 'não instala nada quebrado, mas o botão não funciona.</div>'
+      + '<div class="grave"><b>Cuidado com "Obrigatória".</b> Ligada, o aviso não tem '
+        + 'botão de fechar e o voltar do Android não sai dele. Se o link estiver errado, '
+        + 'todo mundo fica preso numa tela de atualização que não consegue atualizar. '
+        + 'O caminho seguro: publique com ela <i>desligada</i>, teste o download num '
+        + 'aparelho, e só depois ligue se quiser forçar.</div>'
+      + '<p><b>Ordem recomendada:</b> suba o APK → copie o link → preencha versão, link '
+        + 'e novidades → Salvar versão → teste num aparelho → só então marque Obrigatória.</p>'
+    + '</details>'
+  + '</div>';
 
 
 if (SENHA) { $('senha').value = SENHA; entrar(); }
