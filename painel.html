@@ -618,14 +618,59 @@ async function mod(id, desfazer) {
 }
 
 // ===================== saude =====================
+// Ligar isto derruba o app de todo mundo, entao confirma antes -- e o
+// tipo de botao que se aperta com pressa.
+async function manutencao(ligar) {
+  if (ligar && !confirm('Ligar a manutenção trava o app para TODOS os usuários. Confirma?')) return;
+  const box = document.getElementById('mAviso');
+  try {
+    await chamar('salvar_manutencao', {
+      ligada: ligar,
+      titulo: (document.getElementById('mTitulo') || {}).value || '',
+      mensagem: (document.getElementById('mMsg') || {}).value || '',
+      minutos: Number((document.getElementById('mMin') || {}).value || 0),
+    });
+    abrir('saude');
+  } catch (e) {
+    if (box) box.innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>';
+  }
+}
+
 async function saude(c) {
-  const r = await chamar('saude');
+  const [r, m] = await Promise.all([chamar('saude'), chamar('ler_manutencao')]);
   const k = r.chaves || {}, a = r.anuncios || {};
+  const mt = m.manutencao || {};
   function chave(nome, on, dica) {
     return '<tr><td>' + nome + '</td><td><span class="tag ' + (on ? 'ok' : 'no') + '">'
       + (on ? 'ligado' : 'desligado') + '</span></td><td style="color:var(--fraco);font-size:12px">' + dica + '</td></tr>';
   }
-  c.innerHTML = '<div class="grade">'
+  const ligada = !!mt.manutencao;
+  c.innerHTML =
+    '<div class="card' + (ligada ? ' perigoso' : '') + '">'
+      + '<h2>Manutenção ' + (ligada
+          ? '<span class="tag no">LIGADA</span>'
+          : '<span class="tag n">desligada</span>') + '</h2>'
+      + '<p class="sub" style="margin:0 0 12px">Trava o app inteiro e mostra o seu recado. '
+      + 'Vale na hora, sem build e sem passar pela Play. O app volta sozinho quando você desligar.</p>'
+      + '<div class="linha">'
+        + '<input id="mTitulo" placeholder="Título (padrão: Em manutenção)" style="flex:1;min-width:200px" value="' + esc(mt.manutencao_titulo || '') + '">'
+      + '</div>'
+      + '<textarea id="mMsg" placeholder="Estamos ajustando o servidor. Volte em alguns minutos." maxlength="400">' + esc(mt.manutencao_msg || '') + '</textarea>'
+      + '<div class="linha" style="margin-top:10px">'
+        + '<span class="sub" style="margin:0">Desliga sozinha em</span>'
+        + '<select id="mMin">'
+          + [['0','sem prazo'],['15','15 min'],['30','30 min'],['60','1 hora'],['180','3 horas'],['720','12 horas']]
+              .map(function (o) { return '<option value="' + o[0] + '">' + o[1] + '</option>'; }).join('')
+        + '</select>'
+        + (ligada
+            ? '<button class="sec" onclick="manutencao(false)">Desligar agora</button>'
+            : '<button class="perigo" onclick="manutencao(true)">Ligar manutenção</button>')
+        + (ligada ? ' <button class="sec" onclick="manutencao(true)">Atualizar recado</button>' : '')
+      + '</div>'
+      + (mt.manutencao_ate ? '<div class="sub" style="margin:10px 0 0">Desliga sozinha em ' + data(mt.manutencao_ate) + '.</div>' : '')
+      + '<div id="mAviso" style="margin-top:10px"></div>'
+    + '</div>'
+    + '<div class="grade">'
       + kpi(num(a.tickets), 'Tickets de anúncio')
       + kpi(num(a.rewarded), 'Assistiram de verdade')
       + kpi(num(a.fallback), 'Liberados sem anúncio')
