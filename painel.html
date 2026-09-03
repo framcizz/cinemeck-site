@@ -48,7 +48,9 @@ tr.clicavel:hover td{background:#1b1b26}
 .aviso.bom{background:rgba(34,197,94,.12);color:#7ee2a8}
 .vazio{color:var(--fraco);text-align:center;padding:26px;font-size:13px}
 .esc{overflow-x:auto}
-.oculto{display:none}
+/* !important porque .sobre vem depois e tem o mesmo peso: sem isto
+   a gaveta da ficha fica aberta sempre, tapando a pagina toda. */
+.oculto{display:none!important}
 .barra{height:7px;border-radius:5px;background:var(--vermelho);min-width:2px}
 /* gaveta da ficha */
 .sobre{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;justify-content:flex-end;z-index:50}
@@ -57,6 +59,11 @@ tr.clicavel:hover td{background:#1b1b26}
 .gaveta .email{font-size:18px;font-weight:800;word-break:break-all}
 .duas{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
 .perigoso{border:1px solid #52212a;background:#170f12}
+.chk{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none}
+.chk input{width:16px;height:16px;padding:0;accent-color:var(--vermelho);cursor:pointer}
+.campo{display:block;margin-bottom:11px}
+.campo span{display:block;color:var(--fraco);font-size:12px;margin-bottom:5px}
+.campo input{width:100%}
 </style></head><body>
 
 <div id="login" class="login">
@@ -137,6 +144,7 @@ const ABAS = [
   ['notas', 'Avaliações'],
   ['moderacao', 'Moderação'],
   ['saude', 'Saúde'],
+  ['controle', 'Controle do app'],
 ];
 
 function montarAbas() {
@@ -160,6 +168,7 @@ async function abrir(nome) {
     if (nome === 'notas') return await topNotas(c);
     if (nome === 'moderacao') return await moderacao(c);
     if (nome === 'saude') return await saude(c);
+    if (nome === 'controle') return await controle(c);
   } catch (e) {
     c.innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>';
   }
@@ -618,59 +627,15 @@ async function mod(id, desfazer) {
 }
 
 // ===================== saude =====================
-// Ligar isto derruba o app de todo mundo, entao confirma antes -- e o
-// tipo de botao que se aperta com pressa.
-async function manutencao(ligar) {
-  if (ligar && !confirm('Ligar a manutenção trava o app para TODOS os usuários. Confirma?')) return;
-  const box = document.getElementById('mAviso');
-  try {
-    await chamar('salvar_manutencao', {
-      ligada: ligar,
-      titulo: (document.getElementById('mTitulo') || {}).value || '',
-      mensagem: (document.getElementById('mMsg') || {}).value || '',
-      minutos: Number((document.getElementById('mMin') || {}).value || 0),
-    });
-    abrir('saude');
-  } catch (e) {
-    if (box) box.innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>';
-  }
-}
-
 async function saude(c) {
-  const [r, m] = await Promise.all([chamar('saude'), chamar('ler_manutencao')]);
+  const r = await chamar('saude');
   const k = r.chaves || {}, a = r.anuncios || {};
-  const mt = m.manutencao || {};
   function chave(nome, on, dica) {
     return '<tr><td>' + nome + '</td><td><span class="tag ' + (on ? 'ok' : 'no') + '">'
       + (on ? 'ligado' : 'desligado') + '</span></td><td style="color:var(--fraco);font-size:12px">' + dica + '</td></tr>';
   }
-  const ligada = !!mt.manutencao;
   c.innerHTML =
-    '<div class="card' + (ligada ? ' perigoso' : '') + '">'
-      + '<h2>Manutenção ' + (ligada
-          ? '<span class="tag no">LIGADA</span>'
-          : '<span class="tag n">desligada</span>') + '</h2>'
-      + '<p class="sub" style="margin:0 0 12px">Trava o app inteiro e mostra o seu recado. '
-      + 'Vale na hora, sem build e sem passar pela Play. O app volta sozinho quando você desligar.</p>'
-      + '<div class="linha">'
-        + '<input id="mTitulo" placeholder="Título (padrão: Em manutenção)" style="flex:1;min-width:200px" value="' + esc(mt.manutencao_titulo || '') + '">'
-      + '</div>'
-      + '<textarea id="mMsg" placeholder="Estamos ajustando o servidor. Volte em alguns minutos." maxlength="400">' + esc(mt.manutencao_msg || '') + '</textarea>'
-      + '<div class="linha" style="margin-top:10px">'
-        + '<span class="sub" style="margin:0">Desliga sozinha em</span>'
-        + '<select id="mMin">'
-          + [['0','sem prazo'],['15','15 min'],['30','30 min'],['60','1 hora'],['180','3 horas'],['720','12 horas']]
-              .map(function (o) { return '<option value="' + o[0] + '">' + o[1] + '</option>'; }).join('')
-        + '</select>'
-        + (ligada
-            ? '<button class="sec" onclick="manutencao(false)">Desligar agora</button>'
-            : '<button class="perigo" onclick="manutencao(true)">Ligar manutenção</button>')
-        + (ligada ? ' <button class="sec" onclick="manutencao(true)">Atualizar recado</button>' : '')
-      + '</div>'
-      + (mt.manutencao_ate ? '<div class="sub" style="margin:10px 0 0">Desliga sozinha em ' + data(mt.manutencao_ate) + '.</div>' : '')
-      + '<div id="mAviso" style="margin-top:10px"></div>'
-    + '</div>'
-    + '<div class="grade">'
+    '<div class="grade">'
       + kpi(num(a.tickets), 'Tickets de anúncio')
       + kpi(num(a.rewarded), 'Assistiram de verdade')
       + kpi(num(a.fallback), 'Liberados sem anúncio')
@@ -685,7 +650,8 @@ async function saude(c) {
       + chave('exigir_versao', k.exigir_versao, 'Recusa quem não manda a versão no cabeçalho')
       + chave('apk_direto', k.apk_direto, 'Atualização por download do APK')
     + '</table></div>'
-    + '<div class="sub" style="margin:10px 0 0;font-size:12px">Para mudar essas chaves, use a aba “Versão do app” no '
+    + '<div class="sub" style="margin:10px 0 0;font-size:12px">Versão, obrigatória e apk_direto mudam na aba '
+    + '“Controle do app”. As chaves de anúncio ficam no '
     + '<a href="admin.html" style="color:var(--vermelho)">painel de administração</a>.</div></div>'
     + '<div class="card"><h2>Importadores</h2><div class="esc"><table>'
       + '<tr><th>Fonte</th><th>Tipo</th><th>Página</th><th>Ciclo</th><th>Último resultado</th><th>Quando</th></tr>'
@@ -697,6 +663,110 @@ async function saude(c) {
         }).join('')
     + '</table></div></div>';
 }
+
+// ===================== controle do app =====================
+//
+// As duas alavancas que valem na hora, sem build novo e sem esperar a
+// Play: a manutencao (trava o app e mostra um recado) e a atualizacao
+// (avisa que saiu versao nova e de onde baixar). Ficam juntas de
+// proposito -- sao as duas coisas que se mexe as pressas, e ninguem
+// quer procurar em dois lugares com o app fora do ar.
+
+// Ligar a manutencao derruba o app de todo mundo, entao confirma antes.
+async function manutencao(ligar) {
+  if (ligar && !confirm('Ligar a manutenção trava o app para TODOS os usuários. Confirma?')) return;
+  const box = document.getElementById('mAviso');
+  try {
+    await chamar('salvar_manutencao', {
+      ligada: ligar,
+      titulo: (document.getElementById('mTitulo') || {}).value || '',
+      mensagem: (document.getElementById('mMsg') || {}).value || '',
+      minutos: Number((document.getElementById('mMin') || {}).value || 0),
+    });
+    abrir('controle');
+  } catch (e) {
+    if (box) box.innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>';
+  }
+}
+
+async function salvarVersao() {
+  const box = $('vAviso');
+  const versao = $('vVersao').value.trim();
+  if (!confirm('Publicar a versão ' + versao + '?\n\nQuem estiver numa versão menor passa a ver o aviso de atualização.')) return;
+  box.innerHTML = '';
+  try {
+    await chamar('salvar_config', {
+      versao: versao,
+      apk_url: $('vApk').value.trim(),
+      notas: $('vNotas').value.trim(),
+      obrigatoria: $('vObrig').checked,
+      apk_direto: $('vDireto').checked,
+    });
+    box.innerHTML = '<div class="aviso bom">Salvo. Já vale para quem abrir o app agora.</div>';
+  } catch (e) {
+    box.innerHTML = '<div class="aviso erro">' + esc(e.message) + '</div>';
+  }
+}
+
+async function controle(c) {
+  const [cf, m] = await Promise.all([chamar('ler_config'), chamar('ler_manutencao')]);
+  const g = cf.config || {};
+  const mt = m.manutencao || {};
+  const ligada = !!mt.manutencao;
+
+  c.innerHTML =
+    '<div class="card' + (ligada ? ' perigoso' : '') + '">'
+      + '<h2>Manutenção ' + (ligada
+          ? '<span class="tag no">LIGADA</span>'
+          : '<span class="tag n">desligada</span>') + '</h2>'
+      + '<p class="sub" style="margin:0 0 12px">Trava o app inteiro e mostra o seu recado. '
+      + 'Vale na hora, sem build e sem passar pela Play. O app volta sozinho quando você desligar.</p>'
+      + '<label class="campo"><span>Título</span>'
+        + '<input id="mTitulo" placeholder="Em manutenção" value="' + esc(mt.manutencao_titulo || '') + '"></label>'
+      + '<span class="sub" style="display:block;font-size:12px;margin-bottom:5px">Recado</span>'
+      + '<textarea id="mMsg" placeholder="Estamos ajustando o servidor. Volte em alguns minutos." maxlength="400">' + esc(mt.manutencao_msg || '') + '</textarea>'
+      + '<div class="linha" style="margin-top:11px">'
+        + '<span class="sub" style="margin:0">Desliga sozinha em</span>'
+        + '<select id="mMin">'
+          + [['0','sem prazo'],['15','15 min'],['30','30 min'],['60','1 hora'],['180','3 horas'],['720','12 horas']]
+              .map(function (o) { return '<option value="' + o[0] + '">' + o[1] + '</option>'; }).join('')
+        + '</select>'
+        + (ligada
+            ? '<button class="sec" onclick="manutencao(false)">Desligar agora</button>'
+              + '<button class="sec" onclick="manutencao(true)">Atualizar recado</button>'
+            : '<button class="perigo" onclick="manutencao(true)">Ligar manutenção</button>')
+      + '</div>'
+      + (mt.manutencao_ate ? '<div class="sub" style="margin:10px 0 0">Desliga sozinha em ' + data(mt.manutencao_ate) + '.</div>' : '')
+      + '<div id="mAviso" style="margin-top:10px"></div>'
+    + '</div>'
+
+    + '<div class="card">'
+      + '<h2>Atualização do app <span class="tag ' + (g.obrigatoria ? 'no' : 'n') + '">'
+        + (g.obrigatoria ? 'obrigatória' : 'opcional') + '</span></h2>'
+      + '<p class="sub" style="margin:0 0 12px">Quem abrir o app numa versão menor que esta vê o aviso de atualização. '
+      + 'Também vale na hora — não é a Play que manda, é este campo.</p>'
+      + '<div class="duas">'
+        + '<div>'
+          + '<label class="campo"><span>Versão mais nova</span>'
+            + '<input id="vVersao" placeholder="1.1.5" value="' + esc(g.versao || '') + '"></label>'
+          + '<label class="campo"><span>Link do APK</span>'
+            + '<input id="vApk" placeholder="https://…/cinemeck.apk" value="' + esc(g.apk_url || '') + '"></label>'
+        + '</div>'
+        + '<div>'
+          + '<span class="sub" style="display:block;font-size:12px;margin-bottom:5px">Novidades desta versão</span>'
+          + '<textarea id="vNotas" style="min-height:104px" maxlength="600" placeholder="O que mudou…">' + esc(g.notas || '') + '</textarea>'
+        + '</div>'
+      + '</div>'
+      + '<div class="linha" style="margin-top:12px">'
+        + '<label class="chk"><input type="checkbox" id="vObrig"' + (g.obrigatoria ? ' checked' : '') + '>Obrigatória (sem botão de fechar)</label>'
+        + '<label class="chk"><input type="checkbox" id="vDireto"' + (g.apk_direto !== false ? ' checked' : '') + '>Baixar o APK direto</label>'
+      + '</div>'
+      + '<button onclick="salvarVersao()">Salvar versão</button>'
+      + (g.atualizado_em ? '<div class="sub" style="margin:10px 0 0">Última mudança: ' + data(g.atualizado_em) + '.</div>' : '')
+      + '<div id="vAviso" style="margin-top:10px"></div>'
+    + '</div>';
+}
+
 
 if (SENHA) { $('senha').value = SENHA; entrar(); }
 </script>
