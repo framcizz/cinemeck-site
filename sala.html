@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Assistir junto — CineMeck</title>
+<meta property="og:title" content="Vem assistir junto no CineMeck" />
+<meta property="og:description" content="Toque para entrar na sala e assistir no mesmo tempo, com chat e voz." />
+<style>
+  :root { --bg:#171722; --card:#1e1e2b; --vermelho:#E50914; --texto:#e8e8ee; --sub:#9b9ba6; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; background:var(--bg); color:var(--texto);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .card {
+    width:100%; max-width:400px; background:var(--card);
+    border:1px solid #2a2a3a; border-radius:18px; padding:28px 24px; text-align:center;
+  }
+  .logo { font-size:26px; font-weight:900; margin-bottom:6px; }
+  .logo span { color:var(--vermelho); }
+  h1 { font-size:18px; margin:6px 0 8px; font-weight:800; }
+  p { color:var(--sub); font-size:14px; line-height:20px; margin:0 0 18px; }
+  .codigo {
+    font-size:34px; font-weight:900; letter-spacing:6px; color:#fff;
+    background:#15151f; border:1px dashed #3a3a4a; border-radius:14px; padding:14px 8px; margin:0 0 18px;
+  }
+  .botao {
+    display:block; width:100%; margin-top:10px; background:var(--vermelho); color:#fff; text-decoration:none;
+    border:none; border-radius:12px; padding:15px; font-size:16px; font-weight:800; cursor:pointer;
+  }
+  .secundario { background:#2a2a38; }
+  .msg { font-size:13px; margin-top:14px; min-height:18px; color:var(--sub); }
+  .erro { color:#ff6b6b; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Cine<span>Meck</span></div>
+    <h1>Te chamaram para assistir junto 🍿</h1>
+    <p>Todo mundo vê o mesmo momento do filme, com chat e voz.</p>
+
+    <div id="comCodigo" style="display:none">
+      <div class="codigo" id="codigo"></div>
+      <a class="botao" id="abrir" href="#">Entrar na sala</a>
+      <button class="botao secundario" id="copiar" type="button">Copiar código</button>
+      <a class="botao secundario" id="baixar" href="https://play.google.com/store/apps/details?id=com.cinemeck.app">Ainda não tenho o app</a>
+    </div>
+
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <script>
+    // ============================================================
+    //  Convite do "Assistir junto"
+    //
+    //  O app manda este link pelo WhatsApp porque o WhatsApp so' deixa
+    //  clicavel link https -- o cinemeck:// ficaria como texto morto.
+    //  Aqui o link vira a sala: no Android o "intent://" abre o app direto
+    //  em /sala/CODIGO e, sem o app, cai na Play. O codigo tambem aparece
+    //  grande, para quem preferir digitar em "Assistir junto".
+    // ============================================================
+    const PLAY = 'https://play.google.com/store/apps/details?id=com.cinemeck.app';
+    // Mesmo alfabeto do banco (abrir_sala): sem I, O, 0 e 1.
+    const VALIDO = /^[A-HJ-NP-Z2-9]{6}$/;
+
+    const msg = document.getElementById('msg');
+    const bruto = (new URLSearchParams(location.search).get('c') || '').trim().toUpperCase();
+
+    if (!VALIDO.test(bruto)) {
+      msg.className = 'msg erro';
+      msg.textContent = 'Este convite está incompleto. Peça o link de novo para quem te chamou.';
+    } else {
+      const codigo = bruto;
+      document.getElementById('comCodigo').style.display = 'block';
+      document.getElementById('codigo').textContent = codigo;
+
+      const android = /android/i.test(navigator.userAgent);
+      const destino = android
+        ? 'intent://sala/' + codigo + '#Intent;scheme=cinemeck;package=com.cinemeck.app;S.browser_fallback_url='
+          + encodeURIComponent(PLAY) + ';end'
+        : 'cinemeck://sala/' + codigo;
+
+      const abrir = document.getElementById('abrir');
+      abrir.href = destino;
+
+      // Tenta abrir sozinho uma vez; se o navegador segurar, o botao resolve.
+      if (android) setTimeout(function () { location.href = destino; }, 300);
+
+      document.getElementById('copiar').addEventListener('click', async function () {
+        try {
+          await navigator.clipboard.writeText(codigo);
+          msg.className = 'msg';
+          msg.textContent = 'Código copiado. No app, vá em Assistir junto e cole.';
+        } catch (e) {
+          msg.className = 'msg';
+          msg.textContent = 'O código é ' + codigo + '.';
+        }
+      });
+    }
+  </script>
+</body>
+</html>
