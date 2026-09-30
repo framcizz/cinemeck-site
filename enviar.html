@@ -64,6 +64,7 @@
     border:none; border-radius:12px; padding:15px; font-size:16px; font-weight:800; cursor:pointer;
   }
   button:disabled { opacity:.55; cursor:default; }
+  .galeria { margin-top:8px; padding:12px; font-size:14px; font-weight:700; background:#2a2a38; }
   .msg { font-size:14px; margin-top:16px; min-height:20px; line-height:1.6; white-space:pre-wrap; }
   .ok { color:#22C55E; }
   .erro { color:#ff6b6b; }
@@ -96,6 +97,8 @@
 
     <label for="imagem">Imagem <span class="opcional">— opcional, link http(s)</span></label>
     <input id="imagem" type="url" placeholder="https://..." />
+    <input id="arquivo" type="file" accept="image/*" hidden />
+    <button type="button" class="galeria" id="galeria">Escolher da galeria</button>
 
     <label>Ao tocar na notificação <span class="opcional">— opcional</span></label>
     <div class="abas">
@@ -160,6 +163,55 @@
     campo.addEventListener('input', atualizarPrevia);
   });
   atualizarPrevia();
+
+  // ---------- foto da galeria ----------
+  // Foto de celular tem 3-8 MB e 4000 px; notificação não precisa disso e
+  // demora a abrir no aparelho de quem recebe. Aqui ela é reduzida para no
+  // máximo 1280 px e vira JPEG antes de subir; a função guarda no bucket
+  // `notificacoes` e devolve o link, que entra no campo da imagem.
+  var arquivo = $('arquivo'), galeria = $('galeria');
+  galeria.addEventListener('click', function () {
+    if (!senha.value.trim()) { mostrar('Digite a senha do painel antes de escolher a foto.', 'erro'); senha.focus(); return; }
+    arquivo.click();
+  });
+  function reduzir(file) {
+    return new Promise(function (ok, falha) {
+      var img = new Image();
+      img.onload = function () {
+        var esc = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight));
+        var c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * esc); c.height = Math.round(img.naturalHeight * esc);
+        var g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(img.src);
+        ok(c.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = function () { falha(new Error('Não consegui abrir essa imagem.')); };
+      img.src = URL.createObjectURL(file);
+    });
+  }
+  arquivo.addEventListener('change', function () {
+    var f = arquivo.files && arquivo.files[0]; arquivo.value = '';
+    if (!f) return;
+    mostrar('', '');
+    galeria.disabled = true; galeria.textContent = 'Enviando foto...';
+    reduzir(f).then(function (base64) {
+      return fetch(API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acao: 'subir_imagem', senha: senha.value.trim(), base64: base64 }),
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (d) {
+          if (!r.ok || !d.ok || !d.url) { mostrar(d.erro || ('Falhou (' + r.status + ')'), 'erro'); return; }
+          imagem.value = d.url; atualizarPrevia();
+          mostrar('Foto enviada. Ela já está no campo da imagem.', 'ok');
+        });
+      });
+    }).catch(function (err) {
+      mostrar('Erro: ' + err.message, 'erro');
+    }).then(function () {
+      galeria.disabled = false; galeria.textContent = 'Escolher da galeria';
+    });
+  });
 
   // ---------- destino do toque ----------
   // Três estados exclusivos: nada, link de fora, ou uma tela do app. A rota
