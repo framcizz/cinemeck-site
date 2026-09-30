@@ -74,6 +74,30 @@ tr.clicavel:hover td{background:#1b1b26}
 .campo{display:block;margin-bottom:11px}
 .campo span{display:block;color:var(--fraco);font-size:12px;margin-bottom:5px}
 .campo input{width:100%}
+/* capas, avaliacoes e comentarios */
+.capa{width:34px;height:51px;border-radius:5px;object-fit:cover;background:#22222e;flex:none;display:block}
+.tit{display:flex;gap:10px;align-items:center;min-width:220px}
+.tit b{display:block;line-height:1.3}
+.tit .e{color:var(--fraco);font-size:11px;margin-top:2px}
+.dist{display:flex;gap:2px;align-items:flex-end;height:22px}
+.dist i{width:7px;background:var(--amarelo);border-radius:2px;min-height:1px}
+.kpi.link{cursor:pointer}
+.kpi.link:hover{border-color:var(--vermelho)}
+.kpi.link .e{color:var(--vermelho)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+button.chip{background:#1b1b26;border:1px solid var(--linha);color:var(--txt);border-radius:20px;padding:5px 11px;font-size:12px;font-weight:600}
+button.chip.on{background:var(--vermelho);border-color:var(--vermelho);color:#fff}
+button.chip span{color:var(--fraco);font-weight:500;margin-left:4px}
+button.chip.on span{color:#ffd6d8}
+.com{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #1c1c26}
+.com:last-child{border-bottom:none}
+.com .corpo{flex:1;min-width:0}
+.com .onde{font-size:12px;color:var(--fraco);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.com .onde b{color:var(--txt);font-size:13px}
+.com .texto{white-space:pre-wrap;word-break:break-word;margin:5px 0}
+.com.fora .texto{color:var(--fraco);text-decoration:line-through}
+.com .meta{font-size:12px;color:var(--fraco)}
+.com .acoes{flex:none}
 </style></head><body>
 
 <div id="login" class="login">
@@ -152,6 +176,7 @@ const ABAS = [
   ['dinheiro', 'Dinheiro'],
   ['conteudo', 'Mais assistidos'],
   ['notas', 'Avaliações'],
+  ['comentarios', 'Comentários'],
   ['moderacao', 'Moderação'],
   ['saude', 'Saúde'],
   ['controle', 'Controle do app'],
@@ -176,6 +201,7 @@ async function abrir(nome) {
     if (nome === 'dinheiro') return await dinheiro_(c);
     if (nome === 'conteudo') return await topConteudo(c);
     if (nome === 'notas') return await topNotas(c);
+    if (nome === 'comentarios') return await comentariosAba(c);
     if (nome === 'moderacao') return await moderacao(c);
     if (nome === 'saude') return await saude(c);
     if (nome === 'controle') return await controle(c);
@@ -184,8 +210,9 @@ async function abrir(nome) {
   }
 }
 
-function kpi(n, r, extra) {
-  return '<div class="kpi"><div class="n">' + n + '</div><div class="r">' + r + '</div>'
+// `aba`: o numero vira atalho para a aba que mostra o detalhe dele.
+function kpi(n, r, extra, aba) {
+  return '<div class="kpi' + (aba ? ' link" onclick="abrir(\'' + aba + '\')' : '') + '"><div class="n">' + n + '</div><div class="r">' + r + '</div>'
     + (extra ? '<div class="e">' + extra + '</div>' : '') + '</div>';
 }
 
@@ -199,7 +226,8 @@ async function visao(c) {
     + kpi(num(v.ativos), 'VIPs ativos', num(v.vencendo_7d) + ' vencem em 7 dias')
     + kpi(dinheiro(d.pago_30d), 'Recebido (30 dias)', dinheiro(d.pago_total) + ' no total')
     + kpi(num(d.pendentes), 'Pix pendentes')
-    + kpi(num(e.avaliacoes), 'Avaliações', num(e.comentarios) + ' comentários')
+    + kpi(num(e.avaliacoes), 'Avaliações', 'ver por filme e série →', 'notas')
+    + kpi(num(e.comentarios), 'Comentários', 'ver onde e excluir →', 'comentarios')
     + '</div>';
 
   h += '<div class="card"><h2>Catálogo</h2><div class="grade" style="margin:0">'
@@ -593,20 +621,175 @@ async function topConteudo(c) {
 function verDias(d) { sessionStorage.setItem('cm_dias', d); abrir('conteudo'); }
 
 // ===================== avaliacoes =====================
+// Capa pequena: o catalogo guarda a do TMDB em w500; w92 basta aqui.
+function capa(url) {
+  const u = String(url || '').replace('/t/p/w500/', '/t/p/w92/');
+  return u
+    ? '<img class="capa" loading="lazy" src="' + esc(u) + '" alt="" onerror="this.style.visibility=\'hidden\'">'
+    : '<div class="capa"></div>';
+}
+function tipoTag(t) {
+  if (t === 'movie') return '<span class="tag n">Filme</span>';
+  if (t === 'post') return '<span class="tag q">Post do feed</span>';
+  return '<span class="tag n">Série</span>';
+}
+function nota1(v) { return (Number(v) || 0).toFixed(1).replace('.', ','); }
+
+let NOTAS = [], nOrdem = 'votos', nBusca = '';
+const ORDENS_NOTA = [['votos', 'Mais votados'], ['melhor', 'Melhor nota'], ['pior', 'Pior nota'], ['recentes', 'Votados agora']];
+
 async function topNotas(c) {
-  const r = await chamar('top_avaliados', { min_votos: 1, limite: 40 });
-  const itens = r.itens || [];
-  c.innerHTML = '<div class="card"><h2>Melhores avaliados</h2>'
-    + (itens.length
-      ? '<div class="esc"><table><tr><th>#</th><th>Tipo</th><th>Id</th><th>Nota</th><th>Votos</th></tr>'
-        + itens.map(function (x, i) {
-            return '<tr><td>' + (i + 1) + '</td><td>' + (x.media_type === 'tv' ? 'Série' : 'Filme') + '</td>'
-              + '<td>' + esc(x.item_id) + '</td>'
-              + '<td class="num"><b style="color:var(--amarelo)">' + Number(x.media).toFixed(1).replace('.', ',') + '</b></td>'
-              + '<td class="num">' + num(x.votos) + '</td></tr>';
-          }).join('') + '</table></div>'
-      : '<div class="vazio">Ainda não há avaliações. Elas aparecem aqui assim que a primeira pessoa votar no app.</div>')
-    + '</div>';
+  const r = await chamar('listar_avaliacoes');
+  NOTAS = r.itens || [];
+  c.innerHTML = '<div class="card"><h2>Avaliações por título</h2>'
+    + '<div class="sub" style="margin-bottom:12px">' + num(r.total) + ' avaliações em ' + num(NOTAS.length)
+    + ' títulos · média geral <b style="color:var(--amarelo)">★ ' + nota1(r.media_geral) + '</b></div>'
+    + '<div class="linha"><input id="nBusca" placeholder="Buscar título" style="flex:1;min-width:180px" value="' + esc(nBusca) + '">'
+    + '<div class="chips" style="margin:0" id="nOrdens"></div></div>'
+    + '<div id="nLista"></div></div>';
+  $('nBusca').addEventListener('input', function () { nBusca = this.value; pintarNotas(); });
+  pintarNotas();
+}
+function ordemNota(o) { nOrdem = o; pintarNotas(); }
+function pintarNotas() {
+  $('nOrdens').innerHTML = ORDENS_NOTA.map(function (o) {
+    return '<button class="chip' + (o[0] === nOrdem ? ' on' : '') + '" onclick="ordemNota(\'' + o[0] + '\')">' + o[1] + '</button>';
+  }).join('');
+  const termo = nBusca.trim().toLowerCase();
+  const itens = NOTAS.filter(function (x) {
+    return !termo || String(x.titulo || '').toLowerCase().includes(termo);
+  }).sort(function (a, b) {
+    if (nOrdem === 'melhor') return b.media - a.media || b.votos - a.votos;
+    if (nOrdem === 'pior') return a.media - b.media || b.votos - a.votos;
+    if (nOrdem === 'recentes') return String(b.ultima).localeCompare(String(a.ultima));
+    return b.votos - a.votos || b.media - a.media;
+  });
+  if (!NOTAS.length) {
+    $('nLista').innerHTML = '<div class="vazio">Ainda não há avaliações. Elas aparecem aqui assim que a primeira pessoa votar no app.</div>';
+    return;
+  }
+  $('nLista').innerHTML = itens.length
+    ? '<div class="esc"><table><tr><th>#</th><th>Título</th><th>Nota</th><th>Votos</th><th>1★ … 5★</th><th>Último voto</th></tr>'
+      + itens.map(function (x, i) {
+          const teto = Math.max.apply(null, (x.barras || [0]).concat([1]));
+          return '<tr><td>' + (i + 1) + '</td>'
+            + '<td><div class="tit">' + capa(x.poster) + '<div><b>' + esc(x.titulo || 'Título fora do catálogo (#' + x.item_id + ')') + '</b>'
+            + '<div class="e">' + tipoTag(x.tipo) + (x.tmdb_id ? ' TMDB ' + esc(x.tmdb_id) : '') + '</div></div></div></td>'
+            + '<td class="num"><b style="color:var(--amarelo)">★ ' + nota1(x.media) + '</b></td>'
+            + '<td class="num">' + num(x.votos) + '</td>'
+            + '<td><div class="dist" title="' + (x.barras || []).map(function (n, k) { return (k + 1) + '★: ' + n; }).join(' · ') + '">'
+            + (x.barras || []).map(function (n) { return '<i style="height:' + Math.round(n / teto * 100) + '%"></i>'; }).join('')
+            + '</div></td>'
+            + '<td>' + dia(x.ultima) + '</td></tr>';
+        }).join('') + '</table></div>'
+    : '<div class="vazio">Nenhum título com esse nome.</div>';
+}
+
+// ===================== comentarios =====================
+// Todos os comentarios do app com o lugar onde foram feitos. "Excluir"
+// marca como removido (o app mostra "Comentário removido.") e da para
+// restaurar se foi engano.
+let COMS = [], cMais = false, cFiltro = 'todos', cTitulo = '', cGrupos = [];
+const FILTROS_COM = [
+  ['todos', 'Todos'], ['movie', 'Filmes'], ['series', 'Séries'], ['post', 'Feed'],
+  ['denunciados', 'Denunciados'], ['removidos', 'Excluídos'],
+];
+
+async function comentariosAba(c) {
+  const r = await chamar('listar_comentarios', { limite: 300 });
+  COMS = r.comentarios || [];
+  cMais = !!r.mais;
+  c.innerHTML = '<div class="card"><h2>Comentários</h2>'
+    + '<div class="chips" id="cFiltros"></div>'
+    + '<h3 style="margin-top:6px">Onde mais comentam</h3><div class="chips" id="cTitulos"></div>'
+    + '<div id="cLista"></div><div id="cMaisBox" style="text-align:center;margin-top:12px"></div></div>';
+  pintarComentarios();
+}
+function chaveCom(x) { return x.tipo + '|' + x.item_id; }
+function filtroCom(f) { cFiltro = f; pintarComentarios(); }
+function tituloCom(i) {
+  const k = cGrupos[i] ? cGrupos[i].k : '';
+  cTitulo = cTitulo === k ? '' : k;
+  pintarComentarios();
+}
+function passaFiltro(x, f) {
+  if (f === 'removidos') return x.removido;
+  if (f === 'denunciados') return x.denuncias > 0;
+  if (f === 'todos') return true;
+  return x.tipo === f;
+}
+function pintarComentarios() {
+  $('cFiltros').innerHTML = FILTROS_COM.map(function (f) {
+    const n = COMS.filter(function (x) { return passaFiltro(x, f[0]); }).length;
+    return '<button class="chip' + (f[0] === cFiltro ? ' on' : '') + '" onclick="filtroCom(\'' + f[0] + '\')">'
+      + f[1] + '<span>' + num(n) + '</span></button>';
+  }).join('');
+
+  const porTitulo = new Map();
+  COMS.forEach(function (x) {
+    const k = chaveCom(x);
+    const g = porTitulo.get(k) || { k: k, titulo: x.titulo, tipo: x.tipo, item_id: x.item_id, n: 0 };
+    g.n += 1;
+    porTitulo.set(k, g);
+  });
+  cGrupos = Array.from(porTitulo.values()).sort(function (a, b) { return b.n - a.n; });
+  $('cTitulos').innerHTML = cGrupos.map(function (g, i) {
+    return '<button class="chip' + (g.k === cTitulo ? ' on' : '') + '" onclick="tituloCom(' + i + ')">'
+      + esc(g.titulo || (g.tipo === 'post' ? 'Post apagado' : 'TMDB ' + g.item_id)) + '<span>' + num(g.n) + '</span></button>';
+  }).join('') || '<span class="sub">—</span>';
+
+  const lista = [];
+  COMS.forEach(function (x, i) {
+    if (passaFiltro(x, cFiltro) && (!cTitulo || chaveCom(x) === cTitulo)) lista.push(i);
+  });
+  $('cLista').innerHTML = lista.length
+    ? lista.map(function (i) {
+        const x = COMS[i];
+        const texto = (x.texto || '').trim() || (x.figurinha ? '[figurinha]' : '');
+        return '<div class="com' + (x.removido ? ' fora' : '') + '">'
+          + capa(x.poster)
+          + '<div class="corpo"><div class="onde">' + tipoTag(x.tipo)
+          + '<b>' + esc(x.titulo || (x.tipo === 'post' ? 'Post apagado' : 'Título fora do catálogo (TMDB ' + x.item_id + ')')) + '</b>'
+          + (x.removido ? '<span class="tag no">excluído</span>' : '')
+          + (x.denuncias ? '<span class="tag no">🚩 ' + num(x.denuncias) + (x.denuncias === 1 ? ' denúncia' : ' denúncias') + '</span>' : '')
+          + (x.spoiler ? '<span class="tag q">spoiler</span>' : '')
+          + (x.fixado ? '<span class="tag ok">fixado</span>' : '')
+          + '</div>'
+          + '<div class="texto">' + esc(texto) + '</div>'
+          + '<div class="meta"><b style="color:var(--txt)">' + esc(x.nome || 'Sem nome') + '</b>'
+          + (x.resposta_a_nome != null ? ' · ↳ respondendo ' + esc(x.resposta_a_nome || 'um comentário') : '')
+          + ' · ' + data(x.criado_em)
+          + (x.curtidas ? ' · ♥ ' + num(x.curtidas) : '')
+          + '</div></div>'
+          + '<div class="acoes">' + (x.removido
+            ? '<button class="mini sec" onclick="excluirCom(' + i + ',true)">Restaurar</button>'
+            : '<button class="mini perigo" onclick="excluirCom(' + i + ',false)">Excluir</button>')
+          + '</div></div>';
+      }).join('')
+    : '<div class="vazio">Nenhum comentário aqui.</div>';
+
+  $('cMaisBox').innerHTML = cMais
+    ? '<button class="sec" onclick="maisComentarios(this)">Carregar mais antigos</button>' : '';
+}
+async function excluirCom(i, desfazer) {
+  const x = COMS[i];
+  if (!x) return;
+  try {
+    await chamar('remover_comentario', { comentario_id: x.id, desfazer: desfazer });
+    x.removido = !desfazer;
+    pintarComentarios();
+  } catch (e) { alert(e.message); }
+}
+async function maisComentarios(b) {
+  const ultimo = COMS[COMS.length - 1];
+  if (!ultimo) return;
+  b.disabled = true;
+  try {
+    const r = await chamar('listar_comentarios', { limite: 300, antes: ultimo.criado_em });
+    COMS = COMS.concat(r.comentarios || []);
+    cMais = !!r.mais;
+    pintarComentarios();
+  } catch (e) { alert(e.message); b.disabled = false; }
 }
 
 // ===================== moderacao =====================
