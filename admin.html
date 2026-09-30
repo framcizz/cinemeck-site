@@ -99,6 +99,14 @@
   .marcador { display:flex; align-items:center; gap:8px; margin-top:14px; }
   .marcador input { width:auto; }
   .marcador label { margin:0; color:var(--texto); font-size:14px; }
+  .repCats { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .repCat { font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px;
+            background:rgba(138,180,255,.13); color:#8ab4ff; }
+  .repTexto { font-size:12.5px; color:var(--texto); margin-top:6px; line-height:1.5;
+              background:var(--campo); border-radius:8px; padding:7px 9px; word-break:break-word; }
+  .repTexto small { color:var(--sub); }
+  .aberto { background:rgba(245,197,24,.15); color:#F5C518; }
+  .resolvido { background:rgba(34,197,94,.15); color:#22C55E; }
 </style>
 </head>
 <body>
@@ -130,6 +138,7 @@
         <div><div class="n" id="nUsados">—</div><div class="r">já usados</div></div>
         <div><div class="n" id="nCupons">—</div><div class="r">cupons ativos</div></div>
         <div><div class="n" id="nPedidos">—</div><div class="r">pedidos abertos</div></div>
+        <div><div class="n" id="nReportes">—</div><div class="r">reportes abertos</div></div>
       </div>
     </div>
 
@@ -242,6 +251,22 @@
       <div class="caixaCodigos oculto" id="caixaPedidos" style="max-height:420px"></div>
     </div>
 
+    <!-- ===== reportes do pessoal ===== -->
+    <div class="card">
+      <h2>Reportes do pessoal</h2>
+      <div class="aviso" style="margin-top:0">
+        O "Qual é o problema?" da ficha e do player. Juntos por título e
+        servidor; quem tem mais gente reclamando vem primeiro.
+      </div>
+      <div class="marcador">
+        <input id="repSoAbertos" type="checkbox" checked />
+        <label for="repSoAbertos">Mostrar só os que faltam resolver</label>
+      </div>
+      <button class="secundario" id="btListarReportes">Ver os reportes</button>
+      <div class="msg" id="msgReportes"></div>
+      <div class="caixaCodigos oculto" id="caixaReportes" style="max-height:480px"></div>
+    </div>
+
     <!-- ===== versao do app ===== -->
     <div class="card">
       <h2>Versão do app</h2>
@@ -332,6 +357,7 @@
     $('nUsados').textContent = d.codigos_usados;
     $('nCupons').textContent = d.cupons_ativos != null ? d.cupons_ativos : '—';
     $('nPedidos').textContent = d.pedidos_pendentes != null ? d.pedidos_pendentes : '—';
+    $('nReportes').textContent = d.reportes_abertos != null ? d.reportes_abertos : '—';
   }
   function atualizarResumo() { chamar('resumo').then(function (d) { if (d.ok) pintarResumo(d); }); }
 
@@ -836,6 +862,160 @@
     }).then(function () { $('btListarPedidos').disabled = false; });
   }
   $('btListarPedidos').addEventListener('click', listarPedidos);
+
+  // ----- reportes do pessoal -----
+  var NOME_CATEGORIA = {
+    travando: 'Travando / buffer', legendas: 'Legendas',
+    audio_video: 'Áudio e vídeo', outro: 'Outro'
+  };
+  var NOME_TIPO = { movie: 'Filme', series: 'Série', drama: 'Drama', canal: 'Canal' };
+  // O app só mostra "Servidor N". Aqui vai o nome interno junto, para
+  // saber em qual painel de provedor olhar.
+  var NUMERO_SERVIDOR = {
+    streambetter: 'Servidor 1', dioneyflix: 'Servidor 1',
+    nixplay: 'Servidor 2', mgeb: 'Servidor 3'
+  };
+  function nomeServidor(s) {
+    if (!s) return 'servidor não informado';
+    return (NUMERO_SERVIDOR[s] || 'Servidor ?') + ' (' + s + ')';
+  }
+
+  // Tudo por textContent: título e "conte mais" são texto de usuário.
+  function linhaReporte(g, caixa) {
+    var linha = document.createElement('div');
+    linha.className = 'ped';
+
+    var topo = document.createElement('div');
+    topo.className = 'pedTopo';
+    var tit = document.createElement('div');
+    tit.className = 'pedTitulo';
+    tit.textContent = g.titulo;
+    var tipo = document.createElement('span');
+    tipo.className = 'selo usado';
+    tipo.textContent = NOME_TIPO[g.tipo] || g.tipo;
+    var selo = document.createElement('span');
+    selo.className = 'selo ' + (g.abertos > 0 ? 'aberto' : 'resolvido');
+    selo.textContent = g.abertos > 0 ? 'aberto' : 'resolvido';
+    topo.appendChild(tit);
+    topo.appendChild(tipo);
+    topo.appendChild(selo);
+    linha.appendChild(topo);
+
+    var info = document.createElement('div');
+    info.className = 'pedInfo';
+    info.textContent = [
+      g.pessoas + (g.pessoas === 1 ? ' pessoa' : ' pessoas'),
+      g.total + (g.total === 1 ? ' reporte' : ' reportes'),
+      nomeServidor(g.servidor),
+      'último ' + dataHora(g.ultimo)
+    ].join(' · ');
+    linha.appendChild(info);
+
+    if (g.episodios && g.episodios.length) {
+      var eps = document.createElement('div');
+      eps.className = 'pedEps';
+      eps.textContent = 'Episódios: ' + g.episodios.join(', ');
+      linha.appendChild(eps);
+    }
+
+    var cats = document.createElement('div');
+    cats.className = 'repCats';
+    Object.keys(g.categorias || {}).forEach(function (c) {
+      var chip = document.createElement('span');
+      chip.className = 'repCat';
+      chip.textContent = (NOME_CATEGORIA[c] || c) + ' ×' + g.categorias[c];
+      cats.appendChild(chip);
+    });
+    linha.appendChild(cats);
+
+    (g.detalhes || []).forEach(function (d) {
+      var t = document.createElement('div');
+      t.className = 'repTexto';
+      t.appendChild(document.createTextNode('"' + d.texto + '" '));
+      var pe = document.createElement('small');
+      pe.textContent = '— ' + (NOME_CATEGORIA[d.categoria] || d.categoria) + ', ' + dataHora(d.em) +
+        (d.versao ? ', app ' + d.versao : '');
+      t.appendChild(pe);
+      linha.appendChild(t);
+    });
+
+    if (g.abertos > 0) {
+      var botoes = document.createElement('div');
+      botoes.className = 'pedBotoes';
+
+      var resolver = function (avisar, bt) {
+        var mensagem = '';
+        if (avisar) {
+          var padrao = 'Arrumamos "' + g.titulo + '". Obrigado por avisar, já pode assistir!';
+          var escrito = prompt(
+            'Notificação para ' + g.pessoas + (g.pessoas === 1 ? ' pessoa' : ' pessoas') +
+            ' que reportou "' + g.titulo + '".\nPode editar o texto:', padrao);
+          if (escrito === null) return;
+          mensagem = escrito.trim() === padrao ? '' : escrito.trim();
+        } else if (!confirm('Resolver "' + g.titulo + '" sem avisar ninguém?')) {
+          return;
+        }
+        bt.disabled = true;
+        chamar('resolver_reporte', {
+          tipo: g.tipo, item_id: g.item_id, servidor: g.servidor, avisar: avisar, mensagem: mensagem
+        }).then(function (r) {
+          if (!r.ok) {
+            mostrar($('msgReportes'), r.erro || 'Não deu para resolver.', 'erro');
+            bt.disabled = false;
+            return;
+          }
+          var txt = 'Resolvido (' + r.resolvidos + (r.resolvidos === 1 ? ' reporte).' : ' reportes).');
+          if (avisar) {
+            txt += ' Avisei ' + r.avisados + ' de ' + r.pessoas + (r.pessoas === 1 ? ' pessoa' : ' pessoas') + '.';
+            if (r.avisados < r.pessoas) {
+              txt += r.aviso_erro ? ' Erro no envio: ' + r.aviso_erro + '.' : ' Os outros não têm aparelho recebendo push.';
+            }
+          }
+          mostrar($('msgReportes'), txt, avisar && r.aviso_erro ? 'erro' : 'ok');
+          atualizarResumo();
+          listarReportes(true);
+        }).catch(function (e) {
+          mostrar($('msgReportes'), 'Falha de rede: ' + e, 'erro');
+          bt.disabled = false;
+        });
+      };
+
+      var btAvisar = document.createElement('button');
+      btAvisar.className = 'btConcluir';
+      btAvisar.textContent = 'resolver e avisar';
+      btAvisar.addEventListener('click', function () { resolver(true, btAvisar); });
+      var btCalado = document.createElement('button');
+      btCalado.className = 'btVoltar';
+      btCalado.textContent = 'resolver sem avisar';
+      btCalado.addEventListener('click', function () { resolver(false, btCalado); });
+      botoes.appendChild(btAvisar);
+      botoes.appendChild(btCalado);
+      linha.appendChild(botoes);
+    }
+
+    caixa.appendChild(linha);
+  }
+
+  // `manterMsg`: depois de resolver, a lista recarrega sem apagar o
+  // "Avisei N pessoas".
+  function listarReportes(manterMsg) {
+    var caixa = $('caixaReportes');
+    $('btListarReportes').disabled = true;
+    chamar('listar_reportes', { so_abertos: $('repSoAbertos').checked }).then(function (d) {
+      if (!d.ok) { mostrar($('msgReportes'), d.erro || 'Não deu para listar.', 'erro'); return; }
+      caixa.innerHTML = '';
+      var grupos = d.grupos || [];
+      grupos.forEach(function (g) { linhaReporte(g, caixa); });
+      if (manterMsg !== true) {
+        mostrar($('msgReportes'), grupos.length ? '' : 'Nenhum reporte por enquanto.', '');
+      }
+      if (grupos.length) caixa.classList.remove('oculto');
+      else caixa.classList.add('oculto');
+    }).catch(function (e) {
+      mostrar($('msgReportes'), 'Falha de rede: ' + e, 'erro');
+    }).then(function () { $('btListarReportes').disabled = false; });
+  }
+  $('btListarReportes').addEventListener('click', function () { listarReportes(false); });
 
   // ----- versão do app -----
   function carregarConfig() {
