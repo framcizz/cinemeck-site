@@ -106,6 +106,10 @@
               background:var(--campo); border-radius:8px; padding:7px 9px; word-break:break-word; }
   .repTexto small { color:var(--sub); }
   .aberto { background:rgba(245,197,24,.15); color:#F5C518; }
+  .em_analise { background:rgba(96,165,250,.15); color:#60A5FA; }
+  .apoios { background:rgba(255,255,255,.08); color:var(--texto); }
+  .btAnalise { background:#1f3350; }
+  .pedBotoes { flex-wrap:wrap; }
   .resolvido { background:rgba(34,197,94,.15); color:#22C55E; }
 </style>
 </head>
@@ -731,9 +735,17 @@
     var selo = document.createElement('span');
     var st = p.status || 'pendente';
     selo.className = 'selo ' + st;
-    selo.textContent = st === 'concluido' ? 'concluído' : st === 'rejeitado' ? 'rejeitado' : 'pendente';
+    selo.textContent = st === 'concluido' ? 'concluído' : st === 'rejeitado' ? 'rejeitado'
+      : st === 'em_analise' ? 'em análise' : 'pendente';
 
     topo.appendChild(tit);
+    // 👍 de quem também quer: o mais apoiado vem primeiro na lista.
+    if (p.apoios > 0) {
+      var apo = document.createElement('span');
+      apo.className = 'selo apoios';
+      apo.textContent = '👍 ' + p.apoios;
+      topo.appendChild(apo);
+    }
     topo.appendChild(selo);
     linha.appendChild(topo);
 
@@ -754,6 +766,14 @@
     info.textContent = partes.join(' · ');
     linha.appendChild(info);
 
+    // O recado aparece no card do pedido, no app.
+    if (p.recado) {
+      var rec = document.createElement('div');
+      rec.className = 'repTexto';
+      rec.textContent = 'Recado: ' + p.recado;
+      linha.appendChild(rec);
+    }
+
     var botoes = document.createElement('div');
     botoes.className = 'pedBotoes';
 
@@ -770,13 +790,16 @@
             bt.disabled = false;
             return;
           }
-          // Só concluir dispara aviso, e só para quem tem conta.
+          // Só concluir dispara aviso: para quem pediu e para quem deu 👍.
           if (novo === 'concluido') {
+            var extraApoio = r.apoiadores_avisados > 0
+              ? ' Avisei também ' + r.apoiadores_avisados + (r.apoiadores_avisados === 1 ? ' pessoa que apoiou.' : ' pessoas que apoiaram.')
+              : '';
             mostrar(
               $('msgPedidos'),
-              r.avisado
+              (r.avisado
                 ? 'Concluído e avisei quem pediu.'
-                : 'Concluído. Aviso não saiu: ' + (r.aviso_erro || 'motivo desconhecido') + '.',
+                : 'Concluído. Aviso para quem pediu não saiu: ' + (r.aviso_erro || 'sem conta ligada') + '.') + extraApoio,
               r.avisado ? 'ok' : 'erro'
             );
           } else {
@@ -790,12 +813,19 @@
     }
 
     if (st !== 'concluido') {
+      var quemApoia = p.apoios > 0
+        ? '\nAs ' + p.apoios + ' pessoas que deram 👍 também são avisadas.'
+        : '';
+      if (p.apoios === 1) quemApoia = '\nA pessoa que deu 👍 também é avisada.';
       botoes.appendChild(botaoStatus(
         'concluir', 'btConcluir', 'concluido',
-        p.tem_dono
+        (p.tem_dono
           ? 'Marcar "' + p.titulo + '" como concluído?\n\nQuem pediu recebe uma notificação.'
-          : 'Marcar "' + p.titulo + '" como concluído?\n\nEste pedido não tem conta ligada, então ninguém será avisado.'
+          : 'Marcar "' + p.titulo + '" como concluído?\n\nEste pedido não tem conta ligada, então quem pediu não será avisado.') + quemApoia
       ));
+    }
+    if (st === 'pendente') {
+      botoes.appendChild(botaoStatus('em análise', 'btAnalise', 'em_analise', null));
     }
     if (st !== 'rejeitado') {
       botoes.appendChild(botaoStatus('rejeitar', 'btRejeitar', 'rejeitado', null));
@@ -803,6 +833,26 @@
     if (st !== 'pendente') {
       botoes.appendChild(botaoStatus('voltar p/ pendente', 'btVoltar', 'pendente', null));
     }
+
+    // Recado da equipe: o texto aparece no card do pedido, dentro do app.
+    var btRecado = document.createElement('button');
+    btRecado.className = 'btVoltar';
+    btRecado.textContent = p.recado ? '✎ recado' : '+ recado';
+    btRecado.addEventListener('click', function () {
+      var texto = prompt('Recado da equipe para "' + p.titulo + '"\n(aparece no pedido, dentro do app; deixe vazio para apagar):', p.recado || '');
+      if (texto === null) return;
+      btRecado.disabled = true;
+      chamar('recado_pedido', { id: p.id, recado: texto }).then(function (r) {
+        if (!r.ok) {
+          mostrar($('msgPedidos'), r.erro || 'Não deu para salvar o recado.', 'erro');
+          btRecado.disabled = false;
+          return;
+        }
+        mostrar($('msgPedidos'), r.recado ? 'Recado salvo.' : 'Recado apagado.', 'ok');
+        listarPedidos();
+      });
+    });
+    botoes.appendChild(btRecado);
 
     var lix = document.createElement('button');
     lix.className = 'lixeira';
