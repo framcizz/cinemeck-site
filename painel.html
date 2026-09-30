@@ -177,6 +177,7 @@ const ABAS = [
   ['conteudo', 'Mais assistidos'],
   ['notas', 'Avaliações'],
   ['comentarios', 'Comentários'],
+  ['reportes', 'Reportes'],
   ['moderacao', 'Moderação'],
   ['saude', 'Saúde'],
   ['controle', 'Controle do app'],
@@ -202,6 +203,7 @@ async function abrir(nome) {
     if (nome === 'conteudo') return await topConteudo(c);
     if (nome === 'notas') return await topNotas(c);
     if (nome === 'comentarios') return await comentariosAba(c);
+    if (nome === 'reportes') return await reportesAba(c);
     if (nome === 'moderacao') return await moderacao(c);
     if (nome === 'saude') return await saude(c);
     if (nome === 'controle') return await controle(c);
@@ -790,6 +792,77 @@ async function maisComentarios(b) {
     cMais = !!r.mais;
     pintarComentarios();
   } catch (e) { alert(e.message); b.disabled = false; }
+}
+
+// ===================== reportes =====================
+// O que o pessoal reportou pelo app (formulário de 01/10): agrupado por
+// título e servidor, com o que cada um escreveu e o e-mail para responder.
+const NOME_SERVIDOR = { dioneyflix: 'Servidor 1', mgeb: 'Servidor 2', nixplay: 'Servidor 3' };
+const NOME_CATEGORIA = { travando: 'Travando', legendas: 'Legendas', audio_video: 'Áudio e vídeo', outro: 'Outro' };
+let REPS = [], repAbertos = true;
+
+async function reportesAba(c) {
+  const r = await chamar('listar_reportes', { so_abertos: repAbertos });
+  REPS = r.grupos || [];
+  c.innerHTML = '<div class="card"><h2>Reportes do pessoal</h2>'
+    + '<div class="chips">'
+    + '<button class="chip' + (repAbertos ? ' on' : '') + '" onclick="repFiltro(true)">Abertos</button>'
+    + '<button class="chip' + (!repAbertos ? ' on' : '') + '" onclick="repFiltro(false)">Todos</button>'
+    + '</div>'
+    + '<div id="repMsg"></div><div id="repLista"></div></div>';
+  pintarReportes();
+}
+function repFiltro(abertos) { repAbertos = abertos; abrir('reportes'); }
+function pintarReportes() {
+  if (!REPS.length) { $('repLista').innerHTML = '<div class="vazio">Nenhum reporte por aqui. Boa notícia.</div>'; return; }
+  $('repLista').innerHTML = REPS.map(function (g, i) {
+    const cats = Object.keys(g.categorias || {}).map(function (k) {
+      return '<span class="tag n">' + esc(NOME_CATEGORIA[k] || k) + ' ' + num(g.categorias[k]) + '</span>';
+    }).join(' ');
+    const eps = (g.episodios || []).length ? '<div class="meta" style="margin-top:4px">Episódios: ' + esc(g.episodios.join(', ')) + '</div>' : '';
+    const dets = (g.detalhes || []).map(function (d) {
+      return '<div class="com" style="padding:10px 0"><div class="corpo">'
+        + '<div class="onde"><span class="tag q">' + esc(NOME_CATEGORIA[d.categoria] || d.categoria) + '</span>'
+        + (d.episodio ? '<span class="tag n">' + esc(d.episodio) + '</span>' : '')
+        + '<span>' + data(d.em) + (d.versao ? ' · v' + esc(d.versao) : '') + '</span></div>'
+        + (d.texto ? '<div class="texto">' + esc(d.texto) + '</div>' : '<div class="texto" style="color:var(--fraco)">(sem descrição)</div>')
+        + (d.email ? '<div class="meta">✉️ <a style="color:#7ab8ff" href="mailto:' + esc(d.email) + '?subject=' + encodeURIComponent('CineMeck: ' + g.titulo) + '">' + esc(d.email) + '</a></div>' : '')
+        + '</div></div>';
+    }).join('');
+    return '<div class="card" style="margin-bottom:12px">'
+      + '<div class="onde" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+      + tipoTag(g.tipo === 'movie' ? 'movie' : 'series')
+      + '<b style="font-size:15px">' + esc(g.titulo) + '</b>'
+      + '<span class="tag n">' + esc(NOME_SERVIDOR[g.servidor] || 'Servidor ?') + '</span>'
+      + (g.abertos ? '<span class="tag no">' + num(g.abertos) + ' aberto' + (g.abertos === 1 ? '' : 's') + '</span>' : '<span class="tag ok">resolvido</span>')
+      + '</div>'
+      + '<div class="meta" style="margin-top:6px">' + num(g.pessoas) + (g.pessoas === 1 ? ' pessoa' : ' pessoas')
+      + ' · ' + num(g.total) + (g.total === 1 ? ' reporte' : ' reportes') + ' · último ' + data(g.ultimo) + '</div>'
+      + '<div style="margin-top:6px">' + cats + '</div>' + eps
+      + (dets ? '<div style="margin-top:8px">' + dets + '</div>' : '')
+      + (g.abertos ? '<div class="linha" style="margin-top:10px">'
+        + '<button class="mini" onclick="resolverRep(' + i + ',true)">Resolver e avisar</button>'
+        + '<button class="mini sec" onclick="resolverRep(' + i + ',false)">Resolver sem avisar</button></div>' : '')
+      + '</div>';
+  }).join('');
+}
+async function resolverRep(i, avisar) {
+  const g = REPS[i];
+  if (!g) return;
+  let mensagem = '';
+  if (avisar) {
+    const padrao = 'Arrumamos "' + g.titulo + '". Obrigado por avisar, já pode assistir!';
+    const escrito = prompt('Notificação para quem reportou "' + g.titulo + '". Pode editar:', padrao);
+    if (escrito === null) return;
+    mensagem = escrito.trim() === padrao ? '' : escrito.trim();
+  } else if (!confirm('Resolver "' + g.titulo + '" sem avisar ninguém?')) {
+    return;
+  }
+  try {
+    const r = await chamar('resolver_reporte', { tipo: g.tipo, item_id: g.item_id, servidor: g.servidor, avisar: avisar, mensagem: mensagem });
+    alert('Resolvido.' + (avisar ? ' Avisei ' + r.avisados + ' de ' + r.pessoas + '.' : ''));
+    abrir('reportes');
+  } catch (e) { alert(e.message); }
 }
 
 // ===================== moderacao =====================
