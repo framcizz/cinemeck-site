@@ -349,6 +349,19 @@ function listinha(titulo, itens, linha, vazio) {
     + '</div>';
 }
 
+// Selo do anti-mod na ficha (01/10). "Reprovado" e' so' quando o Google
+// viu o app com assinatura de fora (mod). Sem veredito do Google
+// (UNEVALUATED: emulador, aparelho de teste -- como a conta de revisao da
+// Play) e' outra coisa: nao e' mod, e o servidor deixa passar.
+function tagIntegridade(integ) {
+  if (!integ) return '';
+  if (integ.app_ok) return '<span class="tag ok">app original</span>';
+  if (!integ.veredito || integ.veredito === 'UNEVALUATED') {
+    return '<span class="tag q">sem veredito do Google</span>';
+  }
+  return '<span class="tag no">app modificado</span>';
+}
+
 function pintarFicha(f) {
   const c = f.conta || {}, g = f.gasto || {}, vip = f.vip || {};
   const temVip = vale(vip.vip_ate);
@@ -361,7 +374,7 @@ function pintarFicha(f) {
         + '<div style="margin-top:7px">'
           + (temVip ? '<span class="tag ok">VIP até ' + dia(vip.vip_ate) + '</span> ' : '<span class="tag n">sem VIP</span> ')
           + (c.email_confirmado ? '' : '<span class="tag q">e-mail não confirmado</span> ')
-          + (integ ? '<span class="tag ' + (integ.app_ok ? 'ok' : 'no') + '">app ' + (integ.app_ok ? 'original' : 'reprovado') + '</span>' : '')
+          + tagIntegridade(integ)
         + '</div>'
       + '</div>'
       + '<button class="sec mini" onclick="fecharFicha()">Fechar ✕</button>'
